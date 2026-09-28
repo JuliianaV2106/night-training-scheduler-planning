@@ -1,0 +1,397 @@
+---
+name: Night Training Scheduler
+status: final
+sources:
+  - '{project-root}/planning/prd.md'
+updated: 2026-09-28
+---
+
+# Night Training Scheduler — Experience Spine
+
+Behavioural contract for Phase 2. `DESIGN.md` is the visual identity reference and owns how this looks; this spine owns how it works. **The two spines win on conflict with any mock, wireframe, or import.** Every state name, `FR-N`/`NFR-N` id, `UJ-N` name, reason code, decision value and persona name below is taken verbatim from `planning/prd.md` and is not translated. Where the PRD is silent, the item is in [Open Questions](#open-questions), not filled in.
+
+## Foundation
+
+Two surfaces, one module.
+
+**The operations console** — desktop-first, data-dense, dark-themed by default. It carries the status strip, the board, the Admission Order, the job and node detail views, the event log, the submission form, and the admin controls. It is the "board" of FR-25 and FR-28. FR-1's word "desktop" qualifies the *submission* surface, not this one — the PRD nowhere describes a viewport for the status board, which is the substance of OQ-5. There is **no separate CLI in v1** (FR-28, FR-30) — every control is reachable from the board or the API.
+
+**FastAPI Swagger** — the second surface, auto-generated from the OpenAPI schema, carrying the same Decision Record and citation payloads. It is not a degraded view: an operator debugging a citation reads the `citations` array in Swagger exactly as they read it on the board.
+
+**Two themes, two audiences.** The console is dark-first because Ines Okonkwo works the night shift and opens the board at 21:59:50 (UJ-2). The submission surface is light because Kavita fills in a Job Spec at 14:30 (UJ-1) and should not be reading an instrument panel to do it. Both themes are token-complete — see `DESIGN.md` Colors.
+
+**No UI system is inherited.** The PRD names no component library, framework or design system anywhere. This spine therefore specifies behaviour from first principles and `DESIGN.md` specifies the visual layer from first principles. Flagged as OQ-6.
+
+**Honesty constraint carried from the PRD (A-3).** §5 is explicit that v1 models no real GPU hardware, no container execution, no telemetry, and no model weights — every Training Job is a simulated process with a modelled duration and a modelled memory profile. The console states this on the board, permanently and un-dismissably. An operator must never be able to mistake a prototype run for a production fleet.
+
+**One clock, always visible.** §7.1 and NFR-1: no component reads wall-clock time directly; the Daemon Clock is the single authority, derived from the Simulated Clock in simulation mode. Because the console runs at up to 1440×, the reader must never be unsure whether they are looking at simulated or wall-clock time. The clock readout is permanent, in the status strip, and is never hidden behind a hover.
+
+## Information Architecture
+
+| Surface | Reached from | Persona | PRD basis |
+|---|---|---|---|
+| **Status strip** (persistent) | Always visible; no route | Both | FR-28 operator control; NFR-9 |
+| **Board** | Console default route | Both | FR-25 — "the board displays all 32 Nodes (33 GPU slots)" |
+| **Admission Order** | Board → Activation panel; `g a` | Ines | FR-8(a); FR-15(b); named in NFR-15 |
+| **Pending Set** | Board → Queue panel; `g q` | Both | FR-7; §3 Pending Set |
+| **Job detail** | Any job row, board tile, or log line; `g j` | Both | FR-25 — query for `JOB-0417` |
+| **Decision Record detail** | Job detail → any record; banner click | Both | FR-24; §6 |
+| **Node detail** | Any slot tile; `g n` | Ines | FR-12; FR-13; FR-23 |
+| **Event log** | Board → Log panel; `g l` | Ines | FR-26 |
+| **Search results** | `/` from any surface | Both | FR-25 — query for `JOB-0417` |
+| **Submission** | `n` (new job); Kavita's landing route | Kavita | FR-1; FR-2; FR-4 |
+| **Activation panel** | **On the Board at 21:59:00**, and Board → Activation; `g a` | Ines | FR-8(a); FR-8(e); FR-15(b) |
+| **Cordon clearance** | Node detail → Cordon; Ines only | Ines | FR-23; FR-26 `CORDON_CLEARED`; FR-30 |
+| **Quarantine release** | Job detail → Quarantine; Ines only | Ines | FR-20(c); FR-20(e) |
+| **Priority administration** | Job detail → Priority; Ines only | Ines | FR-17 |
+| **Simulation run panel** | Status strip → Run; Ines only | Ines | FR-28; FR-29; FR-30 |
+| **API (Swagger)** | Separate origin | Both | FR-30; FR-31 |
+
+Modal depth is capped at one. A Decision Record opens as a side panel, never as a dialog on top of the job detail it belongs to.
+
+`Kavita` sees only her own jobs (FR-31(b): `STUDENT` may "submit jobs (FR-1) and read their own jobs (FR-25)"). The board renders her jobs and the fleet's aggregate occupancy; she does not see other submitters' `job_id`s, per FR-25's "theirs" scoping. The Admission Order and Event Log are Ines surfaces and are absent from Kavita's navigation, not merely disabled — a hidden affordance beats a `403` on click.
+
+**The Pending Set is viewer-scoped, and this had to be stated because both readings were available.** For `LAB_ADMIN` it is the whole queue, which is what FR-7's `QUEUE_DEPTH_CAP = 500` bounds. For `STUDENT` it is her own submissions only, so the `QUEUE_DEPTH_CAP` counter beside it is fleet-wide and is labelled as such (`Fleet queue 312 / 500`) rather than being silently her own count — a student who believes her own three jobs are 312 deep has been lied to. Her landing route after a submit is her **job detail**, not the queue: UJ-1's climax is "a position in the Pending Set and a projected first-start time" attached to *her* job, and FR-4's response carries both, so routing her to a 500-row list would bury the one number she came for.
+
+**The Activation panel is on the Board from 21:59:00, not only behind `g a`.** UJ-2 wants the night's plan visible *before* it executes, and the blocked case (FR-8(e)) was already on the board while the normal case was one keystroke away — an odd priority for a failure state.
+
+→ Composition reference: none. No mock or wireframe is bound to this spine in v1; see [Open Questions](#open-questions) OQ-9. Spine wins on conflict.
+
+## Voice and Tone
+
+Brand voice and aesthetic posture live in `DESIGN.md` Brand & Style. This section is microcopy only.
+
+The governing constraint is §6.1: a Decision Record `summary` is one sentence, ≤ 200 characters, naming the actor, the action and the reason, readable without the citation list, and it **must not contain the words "policy", "invalid", "forbidden", or "error" alone as an explanation**. The console never authors a summary — it renders the one the daemon emitted — but the console's own surrounding copy obeys the same discipline, because a UI that says "Policy violation" next to a carefully-cited summary destroys the summary's credibility.
+
+| Do | Don't |
+|---|---|
+| "Not admitted — `NO_ELIGIBLE_NODE`. No Eligible Node at 22:00:00." | "Policy violation" / "Invalid request" / "Forbidden" |
+| "Stopped cleanly. Last durable Checkpoint is step 41,200, digest `sha256:3f9a…c201`." | "Stopped 😢" / "Your job was terminated" |
+| "Eviction failed on `ws-gpu-19`. Work is safe at your 03:10 Checkpoint, step 31,004." | "Error: checkpoint failed" / "Something went wrong" |
+| "`ws-gpu-19` cordoned · `EVICTION_CHECKPOINT_WRITE_FAILED`. Not Eligible until cleared." | "Node 19 is having problems" |
+| "Requires at least 4 Night Windows. Max Night Span is 5." | "This will take a while 🙂" |
+| "Daemon unreachable — data may be stale. Last update 03:14:22." | "Connection error" / "Something went wrong" |
+| Name the rule, then the number: "`MAX_NIGHT_SPAN_EXCEEDED`. 38.75 h ceiling (5 × 7 h 45 min)." | "Limit reached" |
+| Address Ines as an operator and Kavita by her submitted intent | Address either as "user" / "customer" |
+
+Every user-visible string that states a reason cites a reason code in `{typography.mono-label}`. Prose without a code is a defect, because §6.2 makes the citation the only permitted justification.
+
+## Component Patterns
+
+Behavioural. Visual specs live in `DESIGN.md` Components.
+
+| Component | Surfaces | Behavioural rules |
+|---|---|---|
+| **Status strip** | Global | Always mounted. Carries daemon connection state, last-received-update `sim_timestamp`, simulated clock, rate control, countdown to the next decision point. **Never unmounts.** At 1440× the countdown and the clock update on every drained transition batch, not on a timer, so they never disagree with the data below them. |
+| **Job row** | Pending Set, Event log, search results | `Enter` opens Job detail. Right-arrow expands in place to show the last Decision Record without leaving the list. Rows are virtualised — FR-7 allows `QUEUE_DEPTH_CAP = 500` and NFR-2 sizes the system for 500 pending jobs, so the list must stay scrollable at 500 without frame drops. |
+| **Node slot tile** | Board | One tile per GPU slot, not per node. `server-gpu-01` renders a paired tile with a shared header; its two slots are independent. A slot in `draining` shows a live countdown to the 05:53:00 SIGKILL instant. A slot in `cordoned` shows the cause string in place of the state label. `Enter` opens Node detail. |
+| **Admission Order row** | Admission Order | Read-only ordered list: rank, `job_id`, `effective_priority` with its granted/aged decomposition, `admitted_nights` against `max_night_span`, and the Starvation Promotion annotation where it applied. **Fully keyboard-operable** — NFR-15 names this view specifically. The list never animates a re-rank under the cursor, and focus follows the **`job_id`**, not the row position: the order is the daemon's rank output, so a recompute genuinely re-ranks, and a reader left on DOM position 3 after a re-rank is now looking at a different job than the one that was announced. Focus re-resolves to the same `job_id` at its new rank and announces the new rank. |
+| **Job detail** | `JOB-0417` | Per FR-25, returns state, position-or-placement, the **last 10 Decision Records with citations**, and a `next_decision_at` instant. At most 10, which is FR-25's bound, and never fewer: a job with three records returns three and the surface does **not** pad the list to ten. "the last 10" is an upper bound and an earlier draft read it as a quota. What the bound is *for* is stated here, because it needs stating — a bounded window is auditable, an unbounded one is not, so Job detail shows `10 of 27` with a see-more affordance onto the Event log, using the same stated-truncation discipline as the log rather than a silent cut. Renders the retained Checkpoint digest and step whenever the state holds one. |
+| **Decision banner** | Job detail, Node detail, Board, Activation panel, slot inspector | One component, 10 variants, two groups. **Every variant renders `summary` + full `citations`.** Only visual weight differs — see `DESIGN.md` `decision-banner` and the Explainability Contract below. |
+| **Reason panel** | Node detail, Board slot inspector, Job detail | Carries the exclusion reason as a code plus one human sentence. FR-25(d): an idle slot is **never blank**. Codes are verbatim: `M3_CORDONED`, `M4_RESERVED`, `VRAM_CLASS_INSUFFICIENT`, `NO_ELIGIBLE_NODE`, `CAPACITY_EXHAUSTED`, `PRIOR_NODE_INELIGIBLE`. |
+| **Citation chip** | Everywhere a decision renders | Full `authority:identifier@version`, unabbreviated, copyable, never truncated. `self:` citations are visually distinct from delegated authorities so the F-1 split is legible. |
+| **Submission form** | Submission | Field-level validation. FR-2's testable condition requires **three simultaneous rejections reported individually** (digest pinning, VRAM class, Checkpoint interval) — never a single generic "invalid spec". Multi-worker specs short-circuit before FR-2 field validation and render as `OUT_OF_SCOPE_DISTRIBUTED` naming Module 10 (FR-3, F-28). |
+| **Clock control** | Status strip | Segmented: `⏸` `1×` `60×` `360×` `1440×`. Rate change is pacing only. Disabled entirely when the daemon is unreachable. |
+| **Cordon clearance** | Node detail | Ines only. Shows the cordon cause, the failed-write evidence, and the retained Checkpoint. On release, records a `CORDON_CLEARED` event with the actor (FR-26(c)). The panel states plainly that clearing the node does **not** gate the job — T-20 re-admits it onto any Eligible Node. |
+| **Priority administration** | Job detail | Ines only. `URGENT` requires a non-empty reason code and is refused without one (FR-17(b)). Self-declared student intent is shown as `PENDING_REVIEW` and is visibly *not* applied. Revocation takes effect at the next Admission Order computation and never aborts a `RUNNING` job — the UI says so at the point of action. |
+| **Simulation run panel** | Status strip | Run status is `RUNNING` then exactly one of `PASSED` or `FAILED` — never any other terminal state (FR-30(c)). A `FAILED` verdict **names each violated invariant** individually, not as a count. Lists the five Simulation Fault kinds and the active `fault_schedule`. **Authoring a `fault_schedule` is API-only in v1 and the panel says so** — it renders the schedule, the fault kind, the target and the Simulated Clock instant, plus a copyable `POST /simulations` body, but offers no editor. FR-29 wants failure paths "demonstrable and repeatable" and the PRD names no authoring surface; inventing an editor would have been a design decision masquerading as a requirement, so the gap is OQ-11. |
+| **Job status badge** | Everywhere a job appears | The 9-state `status-badge`. Label always present, never icon-only (NFR-15). Terminality is conveyed by label and layout, never by desaturation. |
+
+## State Patterns
+
+### Per-surface Loading / Empty / Error / Success
+
+| Surface | Loading | Empty | Error | Success |
+|---|---|---|---|---|
+| **Board** | Slot tiles render as 33 outlined placeholders at final geometry — never a spinner over a blank field, because layout shift during a Fast-Forward drain is disorienting. Queue panel shows skeleton rows at `{spacing.row-dense}`. | Two distinct empties, and they mean opposite things. **Fleet idle outside the Night Window** (06:00:00–22:00:00): "All 33 GPU slots released. Night Window opens at 22:00:00." **Fleet idle inside the Night Window**: every slot carries a reason code — `NO_ELIGIBLE_NODE`, or a Module 2 `freeze` cited. A night that admits zero jobs must never look like a rendering failure.
+
+**The per-slot reason is unconditional in both windows — only the fleet-level sentence is conditional.** FR-25(d) says the board shows idle Nodes with a reason and never a blank, with no time qualifier, and 06:00–22:00 is exactly when Ines walks the lab at 07:00 asking whether the fleet released. An earlier draft made the reason appear only inside the Night Window, which handed the operator one reassuring sentence and 33 reasonless tiles at the one moment she needs per-slot evidence. The two are a summary over a constant invariant, not alternatives: the sentence is a roll-up, the reasons are the data. The roll-up itself is specified in the Board header below. | `Daemon unreachable — data may be stale`, with the last-received-update `sim_timestamp`, controls disabled, auto-retry. Distinguish this from a genuine Module 2 freeze: a freeze is a *cited decision*, an unreachable daemon is a *transport* fault, and Ines must be able to tell them apart at a glance. | Board settles with no flash or celebratory treatment. The success signal is the countdown marker and the slot tiles reaching their terminal state. |
+| **Board header roll-up** | Always mounted, above the slot grid, and the direct answer to "are all GPUs free?" | Renders `33 slots · N held · N reserved · N draining · N cordoned · N idle`, counts computed per slot and never per node — the roll-up is the aggregate of the same per-slot data the tiles show, so a wrong roll-up would be a wrong board. | "No slot data for this window." with the last-received-update instant, when the query itself failed. | `Daemon unreachable — data may be stale` is distinguished from a Module 2 `freeze`: the first is a transport fault and the last-known counts stay visible and marked stale, the second is a cited decision and the counts are current. | One glance answers the 07:00 question; the roll-up is never the only place a count appears. |
+| **Missed Night Window** | — | Renders when the daemon was down across a 22:00:00 activation, or when a latched drift fault (FR-10) skipped one. | — | A cited `DEFER` banner naming `self:RECONCILIATION-v1` or the drift rule, stating the window was skipped and the next attempt. | The board says "last night's window was missed" in the same place it would have said it succeeded. A board that shows 33 released slots after a skipped window is indistinguishable from a clean dawn, and FR-14(d) ageing quietly changes the Admission Order behind that. |
+| **Admission Order** | Skeleton rows at final geometry, one per Eligible GPU slot (max 33). | "No Pending Set entries. Nothing to order." | If a Daemon Clock drift fault is latched (FR-10), a blocking banner names it: Window Activation is blocked until drift is within tolerance for 3 consecutive checks. The order is not stale — it does not exist yet. | The order renders with its computed-at `sim_timestamp` and the promoting rows annotated. |
+| **Pending Set** | Skeleton rows; queue depth counter populates first (‹len› / `QUEUE_DEPTH_CAP` = 500). | "Pending Set is empty." | At or above `QUEUE_DEPTH_CAP` the form-side refusal is `self:QUEUE-DEPTH-CAP-v1` with a next-available-slot estimate. On the board this is a capacity banner, not an error. | Admitted job appears at its computed position with its projected first-start. |
+| **Job detail** | Field-by-field skeleton in the FR-25 response shape: state, position-or-placement, 10 records, `next_decision_at`. | Not applicable — a `job_id` that resolves always has a state. A 404 renders as "No such `job_id`." | `CHECKPOINT_CORRUPT` is a **reason code on `FAILED`, not a tenth state** — an earlier draft called it "a first-class state" while the badge set has nine, which would have had a developer adding a badge nobody defined. What renders is the `FAILED` badge with this reason: the Checkpoint is in Checkpoint Quarantine, the job is `FAILED`, and a human has been notified. FR-20(e) is explicit that **no Cordon Request is issued for a corrupt artefact**, because a corrupt file is not evidence of a faulty Node — so the UI must not imply the node is suspect. | Detail resolves with the retained Checkpoint digest and step visible. |
+| **Node detail** | Tile expands in place; panel skeleton matches final height. | "Node has no Training Job." — always paired with its eligibility state. A Node is never blank. | A Module 3 health fault or a `SchedulingDisabled` condition renders with the cause string, not a generic "unhealthy". | Node renders with its slot occupancy, its exclusion reasons, and — where relevant — the placement candidates FR-13 requires the Decision Record to name. |
+| **Event log** | Append-only; new lines stream in at the bottom with the viewport pinned only if already pinned. | "No events for this window." | Truncation is stated, never silent: "showing ‹k› of N". The PRD sets no event-log page size, so the number is a server-supplied `k` and is not hard-coded; 500 is `QUEUE_DEPTH_CAP`, a different constant that has nothing to do with log pagination. The log survives daemon restart (FR-26(d)), so an error here means a real query failure, not an expected one. | Log reconstructs a night on demand — FR-26's testable condition is that replaying it yields the identical state vector. |
+| **Submission** | Field-level; the form is never disabled wholesale, because a student mid-entry at 14:30 must not lose their work to a background poll. | Not applicable — a form is never empty-state. | **Four distinct refusals, never conflated.** `DENY` with a cited delegated verdict (entitlement/quota/policy — needs a non-`self:` citation per F-1). `DENY` with a scope or span rule (`OUT_OF_SCOPE_DISTRIBUTED`, `self:MAX-NIGHT-SPAN-v1`) which may cite `self:` alone. `DENY` with a capacity rule (`self:QUEUE-DEPTH-CAP-v1`, and `self:CHECKPOINT-STORE-BUDGET-v1` — the last of these is mandatory under NFR-13 and carries its own 1-simulated-minute escalation record, so it is a case of its own rather than a variant of the queue-depth one). And a **missing** verdict, which per FR-6(b) is a blocking error and never a default ALLOW — it renders as "Cannot verify entitlement. Nothing was queued." HTTP 409 on idempotency-key conflict renders separately and states that no job was created. FR-2 field rejections are a fifth, different thing entirely: they are per-field and never collapse into a single refusal. An earlier draft counted three and buried NFR-13 inside a sentence about a capacity banner, which is a refusal with its own Decision Record and therefore its own branch. | HTTP 201 with the state, the Pending Set position, the projected first-start, the Retention Deadline, and `estimated_completion_nights`. Per FR-4(b) `requires_multiple_nights = true` is set **whenever** the estimate exceeds the Usable Night Duration — unconditionally, not "where the estimate exceeds", since FR-4(b) admits no exception — and `estimated_completion_nights` is a named FR-4 output that the earlier draft left out of the success contract entirely. |
+| **Cordon clearance** | Evidence panel loads before the action button enables. | Not applicable. | Cordon Request **rejected** by Module 3 (FR-23(h), known limitation 1): the Node stays not-Eligible locally for the remainder of the night regardless, and the rejection is shown as a recorded Decision Record. The UI must not offer a false "retry". | `CORDON_CLEARED` recorded with the actor; the slot returns to the Eligible set on its next health evaluation (UJ-6). |
+| **Priority administration** | Granted Priority loads read-only from the Policy Engine. | "No grant. Granted Priority is read from the Policy Engine (Module 2), never declared by the student." | A `URGENT` grant without a reason code is refused inline on the field. The panel lives on Job detail (there is nothing on a blank form to refuse), so "inline" means at the reason-code input, before the grant is submitted to the Policy Engine — not on the submission form. HTTP 403 with a cited role mismatch (FR-31(e)) renders as a banner, **never a silent no-op**. | Grant or revocation recorded with the actor; `URGENT` carries its mandatory reason code into the Decision Record. |
+| **Simulation run panel** | Run status reads `RUNNING`. | "No run submitted." | `FAILED` names each violated invariant among S-1…S-3, NFR-4, NFR-5, NFR-6, NFR-7, NFR-10, NFR-14, NFR-16 individually (FR-30(d)). The NFR-1 and NFR-11 build-time static checks and the latency NFRs (NFR-2, NFR-3, NFR-8, NFR-9) are **not** run-gated per F-36 — the panel says so rather than showing them as passed. | `PASSED`, with the run manifest, Decision Record log and event log retrievable. |
+| **Search results** | One skeleton row per result, matched ids in `{typography.mono-data}`. | Three distinct empties, because a search that silently returns nothing is the most expensive kind of nothing. No query: "Search by `job_id` or `node_id`." No match: "No `job_id` or `node_id` matches ‹query›." Matched only on a substring: the result is listed and marked as a substring match. | A malformed `job_id` renders as "Not a `job_id` — expected `JOB-` and 4 digits." rather than an empty result, so a typo is distinguishable from an absence. | Results split under two headings, `job_id` and `node_id`, and the focused result opens its detail with `Enter`. The `job_id` count and `node_id` count are stated separately, so "3 results" never hides a mixed set. |
+| **Event log — integrity** | — | — | — | An `EMITTER_REJECTED` integrity event renders as a **correct outcome**, not a failure: FR-24(b) makes a citation-less record cause the emitter to refuse it and the transition not to be applied, and FR-30 asserts fail-closed as `PASSED`. The log must present this as the system working. |
+
+### The 9 job states
+
+Rendered as `status-badge`. **Colour + glyph + text label on every one** — NFR-15 requires a non-colour encoding with a distinct glyph and text label per state. The table is in `DESIGN.md` Colors; the behavioural notes are here.
+
+| State | Terminal | Node held | What the surface must additionally show |
+|---|---|---|---|
+| `REJECTED` | yes | no | The reason code and the citation. FR-2 requires per-field `pass` or `rule_id` plus a human-readable message; the surface shows each failing field individually. |
+| `QUEUED_PENDING_WINDOW` | no | no | Pending Set position, projected first start, Retention Deadline, `admitted_nights` / `max_night_span`, and the Effective Priority decomposition. May already hold verified Checkpoints — say how many. |
+| `RUNNING` | no | **yes** | `node_id`, slot ordinal, elapsed runtime, `progress_fraction` against `estimated_total_s`, and the last verified Checkpoint step. |
+| `CHECKPOINTING` | no | yes | A live countdown inside the Eviction Ramp, and whether the write is inside the 300 s Checkpoint Budget (05:45:00–05:50:00) or the 05:50:00–05:53:00 reserve. FR-19(b) makes the reserve **still usable**, so the surface must not present the reserve as expired. |
+| `EVICTED_RESUMABLE` | no | no | Retained Checkpoint digest, byte count and step. The next eligible resume. **Never styled or worded as a failure** — UJ-3 specifies the climax reads `EVICTED_RESUMABLE` with a verified digest, "not 'stopped.'" |
+| `COMPLETED` | yes | no | `next_decision_at` is null; the slot is released. |
+| `FAILED` | yes | no | The reason code — `CHECKPOINT_CORRUPT`, `MAX_NIGHT_SPAN_EXCEEDED`, `MODEL_DEPRECATED`, `OOM_KILLED` / `PROCESS_EXITED` — and confirmation that the last verified Checkpoint is retained per FR-22 and Invariant S-2. Two of its six paths have **no reason code in the PRD at all**: T-9 (no verified Checkpoint by 05:53:00) and T-17 (node fault with no verified Checkpoint), which is OQ-14. An `OOM_KILLED` exit additionally carries the remediation FR-29(a) mandates — a cited suggestion to lower the batch size or target a 48 GB-class Node, which is `server-gpu-01` — because the spec has scope-reduction advice for `MAX_NIGHT_SPAN_EXCEEDED` and leaving the OOM twin without it was an omission, not a judgement. |
+| `EVICTION_FAILED` | no | no | The named cordoned Node, the retained verified Checkpoint step, and an explicit "re-admitted at tonight's 22:00:00 Window Activation onto any Eligible Node" (T-20). The critical rendering rule: this badge must not read as terminal. |
+| `EXPIRED` | yes | no | Retention Deadline passed; Checkpoints inside the 7-day expiry grace are retained, and the surface shows when they become garbage-collection eligible. |
+
+### The 5 node-slot states
+
+Two orthogonal attributes per slot — **occupancy** and **eligibility** — because the PRD keeps them separate. `VRAM_CLASS_INSUFFICIENT` is a per-job exclusion reason in a reason panel, never a slot colour.
+
+**They compose, and the composition rule is what was missing.** A slot is not one of five values; it is an occupancy value and an eligibility value, and a developer has to be told which wins when both are present. The rule: **occupancy paints the tile, eligibility adds a mark on it.** A slot running a job that a Module 4 reservation has since taken is `running · reserved` — the ▶ and the ▨ both present, the tile coloured by occupancy, the eligibility carrying a badge in the corner and a word in the accessible name. A slot that is `draining` *and* `cordoned` renders both, and `cordoned` does not release the slot, because FR-23(c) keeps the Node not-Eligible while a job may still be draining on it. The single-state rows below are the cases where eligibility is `eligible` and occupancy is the only attribute; they are not an exhaustive enumeration of what a tile can display. The accessible name is `‹node_id› slot ‹n›, ‹occupancy label›, ‹eligibility label if any›` — two fields, because a name that can hold only one of them is a name that lies.
+
+| Slot state | Behaviour |
+|---|---|
+| available | Free and Eligible. FR-25(d) requires a reason on every idle slot at all times, inside and outside the Night Window alike; the reason is `FREE` outside the window and a cited `NO_ELIGIBLE_NODE` or Module 2 `freeze` inside it. |
+| running | Holds a slot for a `RUNNING` job. Shows the `job_id` and its Granted Priority tier. |
+| draining | **Holds** a slot for a job in `CHECKPOINTING`. The countdown is to the 05:53:00 SIGKILL **only inside the 05:45:00 Eviction Ramp**; during a Preemption at 23:10 the deadline is the 300 s Checkpoint Budget of FR-16(c)/(d) and the tile counts that elapsed instead. FR-16(d) does drive the victim through the same path, but not through a wall-clock deadline that does not exist outside the Ramp. |
+| reserved | Module 4 reservation overlapping the Night Window; per FR-12(b) the Node is not Eligible for the **whole** window. Label carries `M4`. The reservation is a **Node-level** fact applied to every slot of that Node, so both slots of `server-gpu-01` go `reserved` together — the per-slot independence of F-42 governs job occupancy, not an eligibility rule the PRD states at Node granularity. |
+| cordoned | Module 3 health fault or an outstanding Cordon Request from this module. Label carries the cause — e.g. `EVICTION_CHECKPOINT_WRITE_FAILED`. Per FR-23(c) the Node stays not-Eligible for the remainder of the night and until a human clears it, treated optimistically pending Module 3's acknowledgement (A-15). |
+
+### The connection state
+
+`Daemon unreachable — data may be stale`, with the last-received-update `sim_timestamp`, automatic retry, and all controls `aria-disabled` but **not** dimmed to 40% — at that opacity `{colors.text-secondary}` composites to 2.40:1, and a control the operator cannot read is the vanished control this design refuses to create. Unavailability is carried by the label and the ARIA state. This is a **UI state, not a job state** — no job or node state is added, and the PRD needs no amendment. The distinction matters: the surface must never imply the fleet changed while data was stale. No slot, badge or counter updates while in this state; the last known values stay visible and are marked stale rather than blanked.
+
+## Interaction Primitives
+
+**Keyboard-first.** Ines runs a 05:45 ramp and a 22:00 activation without touching the mouse. NFR-15 requires full keyboard operability of the Admission Order view specifically, and the same discipline is applied everywhere.
+
+| Key | Action |
+|---|---|
+| `g` then `b` / `a` / `q` / `j` / `n` / `l` | Go to Board / Admission Order / Pending Set / Job detail / Node detail / Event log. `g j` and `g n` operate on the **focused** row or tile; with nothing focused they follow the last-focused subject, and with no prior subject they go to the route's index rather than nowhere |
+| `n` | New job — submission surface. Bare `n` is a standalone key; `g n` is a two-key sequence, so the two never collide: after `g` the `n` is consumed as a prefix |
+| `↑` `↓` | Move within the focused table or slot grid |
+| `←` `→` | **In a grid**: move between cells in a row — the only way to reach slot 1 of `server-gpu-01` from slot 0. **In a table**: `→` expands the focused job row in place to its last Decision Record and `←` collapses it, so an expansion is always reversible. `Shift+→` expands in *both* contexts when in a grid |
+| `Home` `End` `PgUp` `PgDn` | First / last / one screen up / one screen down, in virtualised lists. At 500 rows, `End` is how Ines reaches the bottom without arrowing 500 times |
+| `Enter` | Open the focused row, tile, or banner. On a banner this navigates to Decision Record detail rather than expanding, because the full record is what a reader who pressed `Enter` on a decision wants |
+| `Esc` | Close the topmost panel. From any detail panel, returns to the originating list at the same scroll offset. `Esc` never closes a panel that a text field has focus in — it leaves the field first |
+| `1` `2` `3` `4` | Set the simulated rate to 1× / 60× / 360× / 1440×. **Position-consistent with the rendered control**, whose segments read `1× 60× 360× 1440× ⏸` |
+| `Space` or `0` | Pause. Pause is deliberately *not* a digit: a control whose fifth segment is `⏸` and whose fifth digit is pause is a control a screen-reader user mis-operates, and a live simulation is the worst thing to mis-operate |
+| `j` (in clock focus) | Jump-to-instant — opens 21:59:00 and 05:44:00 as one-key presets alongside free entry |
+| `/` | Focus the `job_id` / `node_id` search field |
+| `?` | Keyboard reference |
+
+**The clock control's rendered segment order is `1× 60× 360× 1440× ⏸`, and the digit keys are bound position-for-position to it.** An earlier draft put `⏸` first in the control and last in the keymap, so a user counting segments left to right and pressing `5` got pause instead of 1440×, and a user hearing "1×, radio button, 2 of 5" and pressing `1` got 60×. The control is reordered rather than the keymap being made non-obvious.
+
+**Single-key shortcuts are inert while a text field has focus.** This is the rule that keeps the two personas from colliding, and it is not a nicety: the Submission form is a light surface Kavita is typing a pinned SHA-256 container digest and a `checkpoint_interval_minutes` into, a digest is hex so it contains `1`–`5` and `0`, and a 30-minute interval contains `3`. Without a guard, typing `30` silently sets the console to 360× and typing a 64-character digest fires the rate control four times, with no undo, on a run that is live. So: while any text input, textarea or select has focus, `1`–`4`, `Space`, `0`, `g`, `n`, `j` and `?` are inert; `Esc` leaves the field rather than closing a panel; and the rate control remains reachable by `Tab` and by clicking its segments. A shortcut that can fire while someone is typing an identifier is a data-loss bug wearing a keyboard shortcut.
+
+`Esc` always closes the topmost panel, and every detail panel returns focus to the control that opened it at the preserved scroll offset — Job detail, Decision Record detail, Node detail, Cordon clearance, Quarantine release, Priority administration, Simulation run panel and the slot inspector, without exception. An operator auditing five jobs in sequence must never lose their place, and a panel that drops focus to `<body>` on close sends the next `Tab` back to the top of the frame, which is the SC 2.4.3 failure this row exists to prevent.
+
+**Mouse:** click to open. Row actions are revealed on **hover and on keyboard focus equally** — a row action that exists only under the pointer is unreachable by keyboard and undiscoverable by touch, and the same section bans hover-only affordances two paragraphs later. An earlier draft specified hover-only and banned it in the same breath. Hover never carries information available only on hover; the citation list, the reason string and the Checkpoint digest are always in the DOM.
+
+**Banned:** infinite scroll anywhere (pagination or virtualisation only); drag-to-reorder in the Admission Order (the order is the daemon's deterministic output and is read-only); auto-advancing carousels; any animation that moves a value the operator is reading; hover-only affordances; modals nested more than one deep.
+
+**Motion.** At 1440× a simulated day passes in ≤ 75 s (FR-28), which means the board can legitimately repaint many times a second. The only animation permitted on state change is a 120 ms background wash on the changed tile or row. No sliding, no counting numbers, no transitions on values. A board that animates during a Fast-Forward drain is unreadable at exactly the moment it matters.
+
+## Accessibility Floor
+
+Behavioural. Visual contrast lives in `DESIGN.md` and its verified ratios table.
+
+- **WCAG 2.1 AA**, per NFR-15. 4.5:1 for all text; 3:1 for non-text — focus rings, slot tile borders, glyph strokes (SC 1.4.11).
+- **Every one of the 9 job states and 5 slot states carries a distinct glyph and a text label.** Colour is the third channel, never the first. This is NFR-15's explicit requirement, not an interpretation of it.
+- **Full keyboard operability** of the Admission Order view, named by NFR-15. Every control on every surface is reachable and operable without a pointer.
+- **Focus is always visible**: a 2px `{colors.focus-ring}` outline at 2px offset, on the dark ground 9.72:1 and on raised panels 8.89:1; the light theme's `{colors.focus-ring-light}` is 7.59:1 on base and 7.13:1 on raised. The 2px offset is load-bearing: it draws the ring outside the border box, onto the panel ground, so a ring on an `{colors.accent}`-filled clock segment is still measured against a surface it can pass. Focus is never conveyed by colour change alone.
+- **Landmarks and a skip link.** The frame is `<header role="banner">` (status strip), `<nav>` (left rail) and `<main>` (work region), and the first focusable element on every route is a **Skip to work region** link. Without it, a keyboard user crosses the status strip and the rail — eight or more controls — on all thirteen routes, which is SC 2.4.1 Bypass Blocks at Level A and therefore inside the AA claim this file already makes. Tab order follows the three regions in reading order.
+- **Virtualised lists carry position.** Pending Set, Event log, Admission Order and search results set `aria-rowcount` (the full count, not the rendered window) and per-row `aria-rowindex`, or `aria-setsize`/`aria-posinset` on a `role="list"`. UJ-1's climax is a position in the Pending Set; a screen-reader user arrowing the list must hear it, or the one number the journey is built around is unavailable to them. The `role="grid"` uses a roving `tabindex` so the grid is one tab stop.
+- **Live regions are scoped to the smallest stable node.** `aria-live` on the whole status strip would announce every child mutation — connection state, last-update instant, rate, run status — and politeness controls interruption priority, not announcement *rate*, so a region changing many times per second at 1440× still queues many utterances and drowns the assertive channel. So: the per-tick clock and countdown are `aria-live="off"` and are readable on demand, a separate throttled node announces the simulated instant at most once per 30 s, `aria-live="assertive"` is reserved for daemon-unreachable and latched drift only, and the queue-depth counter is `aria-live="off"` per tick with one polite announcement when it crosses `QUEUE_DEPTH_CAP`.
+- **A new Decision Record is announced; an old one is not.** Job *state* changes announce as "JOB-0417 Queued". Decision Records get a `role="alert"` node on first appearance in the focused surface, because the two highest-stakes outcomes in the flows are records rather than transitions — Kavita's UJ-1 submission refusal and the UJ-4 preemption refusal — and a screen-reader user who submits and hears nothing cannot tell success from failure. Once present, the banner is a navigable region, not a live region, and never re-announces on repaint.
+- **Focus order matches reading order** on every surface. Focus never moves on a background poll — if the Admission Order recomputes while focused, the change is announced and the focus stays put.
+- **Status strip is a landmark** — `<header role="banner">` — carrying the connection state, the last-update instant and the rate control. Its live-region behaviour is scoped per child, as specified above, rather than declared once for the whole strip.
+- **Slot grid is a real grid**: `role="grid"` with one row per Node and one cell per GPU slot, so `server-gpu-01` is announced as two slots of one node, reachable with `←`/`→`. Each cell's accessible name is `‹node_id› slot ‹n›, ‹occupancy label›, ‹eligibility label if any›, ‹job_id or reason›`, and for a slot held by another submitter's job the last field reads `occupied by another job` with **no identifier at all**, per FR-31(b). Every state glyph carries `aria-hidden="true"` — in the grid, in the `status-badge`, and in the clock control — because a `⚡` announced as "high voltage" and a `⏸` announced as "check mark button" are worse than no glyph, and the label is already carrying the meaning. A `‹cause›` string on a cordoned slot is included in the accessible name, unabbreviated.
+- **Job state changes are announced** as "JOB-0417 Queued", not as a bare state name, and never as a colour.
+- **Decision banners are regions with a heading**, not toasts. A `PREEMPT` or `EVICT` on someone's thesis run is not a transient message; it persists in the job's history and is navigable.
+- **Citations are real text**, selectable and copyable, in `{typography.mono-label}` — the chip's own token, which an earlier draft gave as `{typography.mono-data}` here and as `{typography.mono-label}` in two other places. An `aria-label` that summarises a citation defeats the point of the §6 contract.
+- **The clock control is a `role="radiogroup"`** of five `role="radio"` with `aria-checked`, named "Simulated clock rate", and a rate change is announced as "Rate 360×" — a screen-reader user pressing a digit gets the new clock reading from the throttled node, which says nothing about the rate they just set. The segment order is the keymap order: `1× 60× 360× 1440× ⏸`.
+- **No time-limited content.** No banner auto-dismisses. The Eviction Ramp countdown stops at 05:53:00 and stays visible; nothing expires the operator's ability to read why their work stopped.
+- **Reduced motion**: `prefers-reduced-motion` replaces the 120 ms wash with a 1px `{colors.border-structure}` border on the affected tile **and row** — rows are included because the wash applies to rows too, and an earlier draft offered a fallback for tiles only. The replacement names a token that clears 3:1; `border-subtle` at 1.34:1 would have made the reduced-motion encoding *less* legible than the one it replaced. Overlay and popover presentation is covered too: the scrim appears instantly and the popover without its entrance transition. The wash is a colour transition rather than motion, so the media query does not suppress it by default — this is stated as a requirement to implement and test, not as a consequence of the query.
+
+## Responsive & Platform
+
+Multi-surface: the console and the FastAPI Swagger origin. Swagger is generated from the OpenAPI schema and is responsive by construction; nothing in this spine constrains it beyond the rule that its payloads match the console's.
+
+The console is **desktop-only in v1, and this is a stated scope decision rather than an omission.** The PRD calls these surfaces "desktop" (FR-1) and the workload is 32 Nodes, 33 GPU slots and a 500-entry Pending Set viewed under time pressure at 22:00 and 05:45 — a job that cannot be read at a glance at 1440px is not read at all.
+
+The consequences are explicit rather than assumed:
+
+- The three-region frame (status strip, left rail, work region) has **no collapse behaviour**. It does not become a sheet, a drawer, or a stacked column at any width.
+- The board's 33 slot tiles reflow to a **narrower tile**, never to horizontal scroll, because a board whose right edge is off-screen cannot answer "are all GPUs released" — the first thing Ines checks at 07:00.
+- The Admission Order and Pending Set virtualise rather than paginate, so 500 rows stay scrollable.
+- `{spacing.row-dense}` 28px is the density floor; no row compresses below it.
+
+Below the desktop floor the console does not degrade, because no honest degraded form of a 33-slot board exists. The PRD names no breakpoint, no minimum viewport and no small-screen behaviour, so nothing is specified here — see OQ-5. The one thing that *is* specified: the console renders a viewport notice below the floor rather than silently clipping, because a clipped operations board is worse than an honest refusal.
+
+That last decision has a consequence which is named rather than glossed: a viewport notice does not satisfy SC 1.4.4 Resize Text or SC 1.4.10 Reflow, and this spine's WCAG 2.1 AA claim holds for the console **at and above its stated desktop floor**, not below it. The floor itself is a design decision, because the PRD does not supply one. Anyone auditing the AA claim needs to know where its boundary is, or the claim is unfalsifiable.
+
+## Inspiration & Anti-patterns
+
+No reference product was named by the user or the PRD, so nothing is lifted. What follows is what was considered and refused, recorded so a later change is deliberate.
+
+**Rejected — colour-only state encoding.** The PRD forbids it (NFR-15) and the module's thesis forbids it: a decision a reader cannot check is not an explainable decision. Every one of the 9 job states and 5 slot states carries a distinct glyph *and* a text label, with colour as the third channel.
+
+**Rejected — treating `EVICTED_RESUMABLE` as an error state.** The obvious visual reading of "the system stopped my job" is red. It is wrong here, and the PRD is unusually explicit about why: UJ-3 specifies the climax reads `EVICTED_RESUMABLE` with a verified digest, "not 'stopped.'" A clean dawn eviction is the module working as designed. Terminality is carried by the label and the layout, never by desaturation.
+
+**Rejected — celebratory and apologetic framing.** No confetti on `COMPLETED`, no consolation on `EVICTED_RESUMABLE`, no emoji in any state label. The module's job is to be checkable, and affective framing is a claim the system cannot substantiate.
+
+**Rejected — generic error copy.** No "Something went wrong", no "Policy violation", no bare "Error". §6.1 forbids a `summary` that leans on "policy", "invalid", "forbidden" or "error" alone, and the console's own copy holds to the same bar so it cannot undercut a carefully-cited summary sitting next to it.
+
+**Rejected — treating the citation as a tooltip.** A citation the reader must hover to find, and which truncates, fails §6.2's purpose. Citations are real, unabbreviated, copyable text in monospace, always in the DOM.
+
+**Rejected — motion during a Fast-Forward drain.** At 1440× the board can legitimately repaint many times a second. The only permitted change animation is a 120 ms background wash, and `prefers-reduced-motion` replaces it with a 1px `{colors.border-structure}` change on the tile *and* the row. Anything that moves a value the operator is reading is banned.
+
+**Rejected — drag-to-reorder and infinite scroll.** The Admission Order is the daemon's deterministic output and is read-only; letting a user rearrange it would misrepresent a computed artefact as a preference. Job lists virtualise or paginate, never scroll infinitely.
+
+**Rejected — a node-level occupancy badge.** A single badge per Node would have to lie about `server-gpu-01`, whose two slots are genuinely independent under F-42. State is per slot, always.
+
+## Explainability Contract
+
+The PRD's §6 is not a feature of this console — it is the reason the console exists. This section is the behavioural spine of FR-24 and it constrains every surface above.
+
+**One Decision Record per transition, always rendered whole.** FR-24(f) makes the mapping injective: every transition has exactly one Decision Record, and every non-transition record carries `transition: null`. The surface renders `transition` when present and renders nothing — never a dash, never an inferred value — when null.
+
+### The `transition` → `decision` map
+
+FR-24's injectivity is testable, and a testable claim needs the map written down. The PRD names a `decision` value for only part of T-1…T-23, and this spine does not invent the rest: where the PRD is explicit the value is given, and where it is silent the row says so and points at OQ-12. Note the field is named `decision` in §6.1 — this file earlier called it `decision_type`, which is not a field the PRD has.
+
+| Where the PRD names a value | `decision` | Cited rule | Gap |
+|---|---|---|---|
+| T-1 window activation, placement (FR-8) | `ADMIT` | delegated verdict, non-`self:` mandatory (F-1) | — |
+| FR-3 multi-worker refusal | `DENY` | `self:SCOPE-BOUNDARY-v1` | — |
+| FR-4(c) span refusal | `DENY` | `self:MAX-NIGHT-SPAN-v1` | — |
+| FR-6(b) missing verdict | `DENY` | delegated authority required (F-1) | — |
+| FR-9(c) reconciliation | — | `self:RECONCILIATION-v1` | value unnamed — OQ-12 |
+| FR-9(d) missed window | `DEFER` | `self:RECONCILIATION-v1` | — |
+| FR-8(e) blocked activation attempt | — | block reason, re-attempt every 5 min to 04:00:00 | value unnamed — OQ-12 |
+| T-16 node fault during a run | — | Module 3 `node-state:` | value unnamed — OQ-12 |
+| T-19 Eviction Ramp success (UJ-3) | `EVICT` | delegated authority mandatory (F-1) | — |
+| FR-20(c) Quarantine / corrupt digest | `FAIL` | `self:CHECKPOINT-QUARANTINE-v1`? | id not in the PRD — OQ-13 |
+| T-20 `EVICTION_FAILED` re-admission | `RESUME` | delegated authority mandatory (F-1) | — |
+| FR-20(f) resume | `RESUME` | delegated authority mandatory (F-1) | — |
+| FR-20 resume deadline missed | `EXPIRE` | delegated authority mandatory (F-1) | — |
+| FR-16(c) refused Preemption | `DEFER` | Preemption Margin citation | enum has no member — OQ-1 |
+| T-1 `REJECTED` terminal states | `COMPLETE` | `self:RECONCILIATION-v1`? | id not named — OQ-13 |
+| T-9 no verified Checkpoint by 05:53:00 | `FAIL` | Eviction Ramp rule | — |
+| T-17 node fault, no verified Checkpoint | `FAIL` | Module 3 | — |
+| Every other T-* transition | — | — | value unnamed — OQ-12 |
+
+**Every banner shows `summary` and `citations`. All ten variants.** SM-5 targets 100% of decisions presented to a user carrying a citation and a one-sentence summary; FR-25(b) requires the citation list rendered for any decision the surface displays. The two groups — adverse (`DENY` `DEFER` `PREEMPT` `EVICT` `EXPIRE` `FAIL` `CORDON`) and neutral/positive (`ADMIT` `RESUME` `COMPLETE`) — differ **only in visual weight**. A quieter `ADMIT` is a de-emphasis, never a citation-stripped summary.
+
+**Every §6.1 field has a named place on the banner.** The anatomy is group glyph + group word, then `decision` as the eyebrow, then `summary`, then `citations` — three slots for eleven fields, which is why the remaining eight had to be placed rather than left implied. `job_id` and `node_id` are **nullable in §6.1**, so the eyebrow renders a record with neither as `Decision · deny` and the detail carries the reason it has no subject, not a dash. `decision_id` and `sim_timestamp` render as a mono metadata line under the summary, `decision_id` first because it is the handle the reader quotes. `inputs` renders as the summary's own trace, not as a JSON blob. `actor_id` renders the resolved display name **and** the raw `actor_id` side by side, per NFR-11 — and where resolution fails, the raw value stands alone rather than a blank, because an unresolvable actor is a fact. `supersedes` renders as a `supersedes ‹decision_id›` link above the eyebrow.
+
+**The F-1 split is visible, not just satisfied.** §6.2 and NFR-4: every `PREEMPT`, `EVICT` and `EXPIRE` requires at least one non-`self:` citation unconditionally, and a `DENY` on a delegated verdict may not cite `self:` alone. The surface renders `self:` citations in muted ink and delegated authorities in accent ink, so a reader can see whether a decision rests on an external authority or on this module's own bookkeeping — the distinction §6.2 says must never be blurred, because "a denial, preemption, or eviction of a user's work may never be justified solely by a time or bookkeeping reason."
+
+**The decision enum the surface renders** is the ten values of §6.1: `ADMIT` `DENY` `DEFER` `PREEMPT` `EVICT` `EXPIRE` `CORDON` `RESUME` `COMPLETE` `FAIL`. A refused Preemption renders as a `DEFER` banner carrying the Preemption Margin citation; the enum has no dedicated member for it, and that gap is OQ-1 rather than something this spine invents.
+
+**Fail-closed is a success state.** FR-24(b): a record with zero citations is rejected by the emitter, the transition it describes is **not applied**, and an `EMITTER_REJECTED` integrity event is logged. The Event log renders that as the system working correctly — which FR-30's F-24 testable condition confirms by asserting a run `PASSED` on exactly this path.
+
+**Names are resolved by the UI, never stored in a record.** NFR-11 and §6.1: `actor_id` is the opaque identifier from Module 1's identity fixture, and the actual name is never written to a log line or a Decision Record. The console resolves `actor_id` to a display name for the operator, and shows the raw `actor_id` alongside so the resolution is auditable. No token, key or credential appears anywhere in the surface (FR-31(f)).
+
+**Supersession is visible.** §6.1 carries `supersedes` for revised decisions. Records are immutable and append-only, so a revised decision appears as a new record linked to its predecessor — never as an edit.
+
+## Simulated Clock
+
+The Simulated Clock is a first-class surface, not a dev tool. FR-28 requires the operator to inspect a 24-hour night in 60 seconds without changing any decision.
+
+**The control set** is exactly FR-28(a): `⏸` pause, and rates `1×` `60×` `360×` `1440×`. No other rate is offered. A rate of 0 pauses without draining the queue (FR-11(c)).
+
+**Rate changes alter pacing only.** FR-11(b) and FR-28(b): changing the rate mid-window may not reorder, add or remove any queued transition. The control therefore never shows a confirmation, a warning, or a "this will change results" note — there is nothing to confirm, and implying otherwise would be a lie about the system's guarantees. What the control *does* show is the reconciliation count, so an operator can watch event fidelity hold across a rate change.
+
+**Jump-to-instant** offers `21:59:00` and `05:44:00` as one-key presets, plus free entry. These are the two instants an operator actually needs: 21:59:00 is the pre-verification budget deadline (§7.5 — every resume in the fleet fully verified by then, worst case all 33 slots within 29 minutes from 21:30:00), and 05:44:00 is the last second before the Eviction Ramp. A jump drains every transition at or before the target instant **before** rendering (FR-28(c)) — the board is never shown mid-drain, because a half-applied window is exactly the state an operator would misread.
+
+**The clock is always visible and always labelled.** The status strip carries the simulated `sim_timestamp` in `{typography.mono-data-lg}` with its explicit timezone offset. §7.1 requires every persisted timestamp to be a Daemon Timestamp plus an explicit offset, so a 24-hour simulated run is reproducible and diffable. Decision D-1 fixes the campus at America/Bogota (UTC−05:00) with no daylight saving, which is why the Night Window is exactly 8 hours on every date. Because the offset is displayed, a reader can never confuse a simulated instant with a wall-clock one.
+
+**Data visibility is rate-independent.** NFR-9: a committed transition is visible on the surface in ≤ 500 ms of real time **at every Fast-Forward rate** (1×, 60×, 360×, 1440×), absolute, measured per rate. The board therefore updates on a fixed cadence that does not scale with the rate, and at 1440× it coalesces rather than queueing 1440 renders per second.
+
+**Faults fire against the Simulated Clock, not real time** (FR-29(b)): a fault scheduled for 05:46:00 fires at 05:46:00 whether the run is at 1× or 1440×. The run panel shows the active `fault_schedule` and the five fault kinds — node fault, Checkpoint write failure, Checkpoint corruption, daemon crash, and training process exit (`PROCESS_EXIT`, incl. `OOM_KILLED`).
+
+**A latched drift fault blocks the board.** FR-10: drift beyond 1 s latches a fault that blocks the next Window Activation, clearing only after drift is within tolerance for 3 consecutive checks. While latched, the Activation control is disabled and a banner names the fault; the board does not silently skip the 22:00 window.
+
+## Key Flows
+
+Protagonists and step order follow `planning/prd.md` §2.3 verbatim. `Kavita` is the senior research student; `Ines Okonkwo` is the GPU lab operations engineer; the Night Daemon Controller is the non-human operator.
+
+### Flow 1 — UJ-1. Kavita submits a LoRA run at 14:30 and is told exactly when it will run.
+
+1. Kavita opens the light-themed submission surface at 14:30. She enters a LoRA Job Spec: pinned container image digest, 1 GPU, 24 GB class node selector, a `checkpoint_interval_minutes`, and a self-declared intent of `THESIS`.
+2. Spec validation returns instantly. The estimated duration comes back as 31 hours. Because it exceeds the 7 h 45 min Usable Night Duration but fits inside the 38.75 h Max Night Span, FR-4(b) sets `requires_multiple_nights = true` unconditionally and the response carries `estimated_completion_nights: 4` — the surface states plainly that this job will run across at least four nights, naming the span ceiling it is being measured against.
+3. Her Granted Priority is read from the Policy Engine (Module 2), not from her declaration. Her `THESIS` is stored as a `PENDING_REVIEW` request visible to the administrator and never applied.
+4. The job enters `QUEUED_PENDING_WINDOW` and the response carries her first estimated start, her position in the Pending Set, and her Retention Deadline. She closes the laptop.
+5. **Climax:** she sees a job state with a name, a position in the Pending Set, and a projected first-start time — before she closes it. She can close the laptop and stop thinking about it, which is the entire emotional payload of the journey.
+
+Failure: her spec requests 2 workers → `REJECTED` with `OUT_OF_SCOPE_DISTRIBUTED`, a `DENY` record citing `self:SCOPE-BOUNDARY-v1` and naming Module 10, and no GPU allocation attempted. Had she declared 52 hours instead of 31, the refusal cites `self:MAX-NIGHT-SPAN-v1`, names both 52 h and the 38.75 h ceiling, and proposes a concrete scope reduction.
+
+### Flow 2 — UJ-2. At 22:00 the fleet wakes up and the night is decided in public.
+
+1. 21:59:50. Ines is on the night shift. The board shows 33 slots idle with a reason each, the Pending Set populated, and a countdown to window activation.
+2. She jumps the clock to 21:59:00 and watches the pre-verification phase complete — every resuming job's digest re-verified, inside the §7.5 budget of all 33 slots by 21:59:00.
+3. At 22:00:00 the Night Daemon Controller performs Window Activation: it filters to Eligible Nodes, computes each pending job's Effective Priority, applies Starvation Promotion, builds the Admission Order, and places jobs.
+4. The board repaints. `ws-gpu-07` goes to `running` carrying Kavita's job, and the reason panel names the rule that put it there. Every placement writes a Decision Record with citations, and this is where the board declares a distinction it had left implicit: it **displays** the citation list for the decisions it renders as a banner, and it **summarises** the remaining placements as one line each in the Admission Order. FR-25(b) requires the citation list "for any decision it displays"; rendering 22 full cited records inline is neither possible at 28px nor useful, and pretending to is how a citation list quietly disappears.
+5. **Climax:** all Eligible Nodes are either running an attributed job or explicitly shown as idle with a stated reason — there is no blank slot anywhere on the board.
+6. The board shows 22 job assignments, each with a citation, and the "next decision point 05:45:00" marker.
+
+Failure: activation is blocked because a delegated verdict is missing. Per FR-8(e) it re-attempts every 5 simulated minutes until 04:00:00, and each attempt is recorded with its block reason cited. The board shows the block, the next attempt instant, and the citation — it does not show an empty fleet with no explanation.
+
+### Flow 3 — UJ-3. 05:45 — a long job is stopped cleanly and keeps its work.
+
+1. 05:44:50. Kavita's thesis job is `RUNNING`, 4 hours into an estimated 31, last durable Checkpoint 22 minutes old. Its slot tile shows `running`.
+2. At 05:45:00 the Eviction Ramp begins. SIGTERM reaches the job. The slot flips to `draining` — still held, because Invariant S-1 permits a hold in `CHECKPOINTING` until 06:00:00 — and a countdown to the 05:53:00 SIGKILL appears. The job badge flips to `CHECKPOINTING`.
+3. The job drains, writes a new Checkpoint, `fdatasync`s the file, atomically renames it into place, `fsync`s the parent directory, and records a SHA-256 digest. A Checkpoint verified any time before 05:53:00 — including in the 05:50:00–05:53:00 reserve — clears the Ramp (F-7).
+4. At 05:53:00 the daemon SIGKILLs any job still in `CHECKPOINTING` and releases the node. Each Node's allocation is released independently and immediately on that job's exit, not at 05:53:00 (FR-19(d)).
+5. **Climax:** the job state reads `EVICTED_RESUMABLE` with a verified Checkpoint digest and a byte count — not "stopped." The badge is violet with a `‖` glyph, never a terminal colour.
+6. The slot returns to `available`. Kavita's notification names the last durable Checkpoint time, the verified step count, and her next eligible resume at 22:00 tonight.
+
+Failure: a job that has not produced a verified Checkpoint by 05:53:00 transitions to `FAILED`, its last verified Checkpoint retained per FR-22, and the `EVICT` banner cites both the Eviction Ramp rule and the Node's last health reading.
+
+### Flow 4 — UJ-4. A thesis-grade submission preempts a low-priority exploration run mid-night.
+
+1. 23:10. Kavita's thesis job is `QUEUED_PENDING_WINDOW` with a Granted Priority of `THESIS` assigned by Module 2 — she asked for nothing, and **no Urgent Grant was needed or requested**. An exploration job holds `ws-gpu-12`, granted `EXPLORATION`, aged 2 nights, showing a 9-hour estimate. No Eligible Node is free.
+2. Kavita's Effective Priority of 50 clears the Preemption Margin over the running job's aged Effective Priority of 22. The challenger holds Preemption authority on both conditions in FR-16(b) — and the *aging* contributed nothing to her authority; the thesis tier did.
+3. The daemon selects a victim, requests Preemption, and drives it through the same Eviction Ramp used at dawn, at 23:10 rather than 05:45. `ws-gpu-12` flips to `draining` and its victim badge to `CHECKPOINTING`. The challenger does not start until the victim's Checkpoint verifies and the Node is released (FR-16(d)).
+4. Only after verification is `ws-gpu-12` reassigned and Kavita's job enters `RUNNING`. The `PREEMPT` banner names both jobs and carries the citations.
+5. **Climax:** Kavita's job is running and she was told *why* the other one stopped. The victim's banner cites the challenger's Granted Priority and the Preemption Margin, so she can check the arithmetic herself.
+6. The victim returns to `QUEUED_PENDING_WINDOW` immediately once its Checkpoint verifies (T-14), with its Checkpoint intact, its **original submission time preserved**, and its Consecutive Nights Missed unchanged — it received an admitted minute this window, so its Effective Priority does not age. It may be re-placed the same night if a slot frees.
+
+Failure: the victim has no Checkpoint and cannot write one inside the Checkpoint Budget. Per FR-16(c) the Preemption is refused and the refusal is explained, citing the Checkpoint Budget rule. The surface renders it as a `DEFER` banner on the challenger, and Kavita waits with the reason in front of her rather than watching a job sit unexplained.
+
+### Flow 5 — UJ-5. The Checkpoint fails while the node is being drained at dawn.
+
+1. 05:45. Kavita's job is `RUNNING`, SIGTERM delivered, Checkpoint write in progress. `ws-gpu-19` shows `draining`.
+2. The write fails. The daemon does not retry on the same node, and it does not leave the GPU allocated — the allocation is released **immediately and unconditionally**, before any retry, diagnosis or notification (FR-23(a)).
+3. It marks the node as failing a health check, issues a Cordon Request to Module 3, records a Decision Record citing the failed write, and moves the job to `EVICTION_FAILED` with reason `CHECKPOINT_WRITE_FAILED`. `ws-gpu-19` flips to `cordoned · EVICTION_CHECKPOINT_WRITE_FAILED`.
+4. **Climax:** `ws-gpu-19` is unavailable for the morning lab, and Kavita's notification says her work is safe at her 03:10 Checkpoint and names the node as quarantined. Her badge is `EVICTION_FAILED` — loud, orange, unmistakably non-terminal — beside a retained digest and step count.
+5. The job holds a verified resume point but no node. The GPU is free. The node is off-limits until Ines clears it; the job itself is not, and the surface says so: re-admitted at tonight's Window Activation (T-20).
+
+Failure: Module 3 *rejects* the Cordon Request. Per FR-23(h) this module still keeps the Node locally not-Eligible for the remainder of the night; the rejection is recorded, and the Node returns to the Eligible set only after a human clears it. The clearance panel states this rather than offering a retry that would fail.
+
+### Flow 6 — UJ-6. Ines clears the cordoned node and Kavita resumes that night.
+
+1. 08:00. Ines walks the lab and finds `ws-gpu-19` reporting `SchedulingDisabled` with cause `EVICTION_CHECKPOINT_WRITE_FAILED`, and Kavita's job in `EVICTION_FAILED` with a retained verified Checkpoint.
+2. She opens the cordon clearance panel, which shows the cause, the failed-write evidence, and the retained Checkpoint. She remediates and releases the cordon. A `CORDON_CLEARED` event is recorded with her as the actor (FR-26(c)).
+
+   Checkpoint Quarantine is a *separate* human obligation and has its own panel on Job detail, reached from the `FAILED` badge rather than from the node. FR-20(c) keeps a quarantined Checkpoint excluded from garbage collection until a human releases it, which makes the quarantine a live liability with an owner — and the previous draft described reading about it while specifying nothing that releases it. The panel shows the digest mismatch as evidence, requires a reason code, records the releasing actor, and repeats FR-20(e): **no Cordon Request**, because a corrupt file is not evidence of a faulty Node.
+3. The node returns to the Eligible Node set on its next health evaluation. Kavita's job does **not** wait for this — it was re-admitted at tonight's Window Activation (T-20) onto a different Eligible Node, because the cordon constrains the Node, not the job. The clearance panel states this explicitly, so Ines does not close the incident believing she unblocked a student's run.
+4. **Climax:** Kavita's job logs `RESUMED_FROM_CHECKPOINT` with the digest it verified, on a Node that is not `ws-gpu-19`. The `RESUME` banner cites the verified digest.
+5. The resume is a normal, cited transition, and the cordon is in the audit log with a human clearance event, closing the loop UJ-5 opened.
+
+Failure: the retained Checkpoint's digest fails re-verification. FR-20(c) places it in Checkpoint Quarantine, transitions the job to `FAILED` with reason `CHECKPOINT_CORRUPT`, emits a `FAIL` record, and notifies a human. Per FR-20(e) **no Cordon Request is issued** — a corrupt file is not evidence of a faulty Node — and the surface must not imply otherwise.
+
+## Open Questions
+
+Gaps in `planning/prd.md` this spine deliberately did not fill. Each is a question for the PRD owner, not a design decision.
+
+1. **No Decision Record member names a refused Preemption.** FR-16(c) requires the refusal to be "explained," and FR-16's testable condition requires a citation naming the Preemption Margin rule, but the §6.1 enum has no value for it. Rendered here as `DEFER`. The enum may need a member, or §6.1 may need to state that `DEFER` covers it.
+2. **No named surface for Checkpoint store pressure.** NFR-13 requires a refusal at submission, an escalation Decision Record within 1 simulated minute, and zero protected deletions; FR-22(d) says the pressure "is reported." No surface is named. Currently surfaced as a capacity banner on the Board and a submission refusal.
+3. **No in-app notification inbox in v1.** §5 routes FR-27 payloads to a local outbox so the test harness can assert on delivery, and FR-27 delegates transport. The *content* is specified — job, outcome, last verified Checkpoint step, next eligible action — but where a human reads it in v1 is unstated. `DELIVERY_FAILED` has no surface either.
+4. **The rate control's initial state is unstated, and that is the part that matters.** FR-28(a) fixes the set — 1×, 60×, 360×, 1440× plus pause — and answers the question an earlier draft raised here, which was whether the sequence is cumulative; it is not, and the four rates are offered exactly as written with no derived presets invented. What the PRD never says is which rate a run *starts* at, or whether a rate survives a page reload mid-window. Left unspecified here, and it is load-bearing: a board that starts at 1440× and one that starts paused are very different first impressions of the same module, and `FR-11(c)`'s rate-0 rule tells us pause is a real state rather than an absence of one.
+5. **Breaks below the desktop floor are undefined.** The PRD calls the surfaces "desktop" and names no breakpoint, no minimum viewport, and no mobile behaviour. A data-dense 33-slot board has no honest small-screen form.
+6. **No UI system is named anywhere in the PRD.** Neither spine inherits a component library, so both specify from first principles. If Phase 3 selects one, DESIGN.md and EXPERIENCE.md narrow to the brand delta and the behavioural delta respectively.
+7. **`PRIOR_NODE_INELIGIBLE` placement note has no surface.** FR-13 requires it in the Decision Record when a resuming job cannot return to its prior Node; whether it also warrants a visible note on the job is unstated. It is a `reason-panel` code and the Reason panel is reachable from Job detail, so it *is* visible there — an earlier draft claimed it lived only in Decision Record detail, which contradicted this spine's own component table. What is actually unresolved is narrower: whether a resumed job that could not return to its prior Node should carry a persistent marker on the board, or only the one-line note at the moment of the decision.
+8. **The A-3 simulation disclaimer has no dismissal semantics.** The surface states that no real GPU is present. Whether it is dismissible, and what re-opens it, is unstated. Currently permanent and un-dismissable.
+9. **No mock or wireframe is bound to this spine.** Every surface in the IA table is specified behaviourally only. Key-screen mocks for the Board, the Admission Order and the Job detail were not produced in this run.
+10. **Open Question 11 in the PRD is load-bearing for a real thesis.** §15 item 11 records that no mechanism exists to authorise an extension past Max Night Span. The Priority administration surface offers no such control, because none is defined. This will need a decision before the module meets a real deadline.
+11. **`fault_schedule` has no authoring surface.** FR-29 makes the failure paths "demonstrable and repeatable" and FR-30 requires `fault_schedule` on every `POST /simulations`, but no surface creates one. The Simulation run panel renders the active schedule and a copyable request body and is explicit that authoring is API-only. An operator demonstrating a failure path to a marker therefore has to leave the console, which undercuts FR-29's stated purpose.
+12. **Most transitions have no named `decision` value.** FR-24(f) makes the transition→record mapping injective, and that is a testable condition — but §6.1 names a value for only part of T-1…T-23. The `transition` → `decision` map in the Explainability Contract gives the PRD's value where it has one and marks the rest rather than guessing, because a wrong guess fails the injectivity test in a way that looks like an implementation bug. Affected at minimum: the FR-8(e) blocked activation attempt, the FR-9(c) reconciliation record, T-16, and every transition not otherwise listed. This is the largest single gap in the spine and the first thing Phase 3 will trip over.
+13. **Two `self:` invariant ids the citations require do not exist in the PRD.** §6.2 requires a `self:invariant-id` citation and F-1 permits a Job-Spec-validation `DENY` to cite `self:` alone — but the PRD names no id for **FR-2's field rules**, so a field-level rejection has no citable identifier and the F-1 path is unreachable. Nor does it name one for the FR-20(c) Checkpoint Quarantine `FAIL`, though it does for `self:RECONCILIATION-v1`, `self:SCOPE-BOUNDARY-v1`, `self:MAX-NIGHT-SPAN-v1`, `self:QUEUE-DEPTH-CAP-v1`, `self:EVICTION-RAMP-v1` and `self:CHECKPOINT-STORE-BUDGET-v1`. Every one of those six is named; the two that are missing are named nowhere.
+14. **Two paths to `FAILED` have no reason code.** T-9 (no verified Checkpoint by 05:53:00) and T-17 (node fault with no verified Checkpoint) both land on `FAILED`, and FR-25's contract has the surface show the reason code — but the PRD supplies no code for either, while it does supply `CHECKPOINT_CORRUPT`, `MAX_NIGHT_SPAN_EXCEEDED`, `MODEL_DEPRECATED` and `OOM_KILLED`. Until they are named, a reader of those two failures sees a terminal badge with nothing checkable under it, which is the one outcome this module's thesis forbids.
+15. **The console's viewport has no PRD basis at all, and the AA claim depends on it.** FR-1's word "desktop" qualifies the submission surface only. Nothing in the PRD describes the status board's viewport, breakpoint or minimum size, so the desktop floor this spine asserts — and the SC 1.4.4 / 1.4.10 boundary that goes with it — are design decisions. OQ-5 records the missing breakpoint; what is recorded here is that a compliance claim in this module rests on a number no requirement supplies.
