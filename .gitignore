@@ -1,0 +1,11 @@
+node_modules/
+.env
+__pycache__/
+*.pyc
+.venv/
+
+# Instalaciones de herramientas IA (se regeneran con el instalador de BMad/WDS)
+.agents/
+.claude/
+.opencode/
+_bmad/
