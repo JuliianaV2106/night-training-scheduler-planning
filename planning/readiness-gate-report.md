@@ -3,7 +3,9 @@ title: "Module 9 — Night Training Scheduler: Implementation Readiness Gate Rep
 status: complete
 verdict: CONCERNS
 created: 2026-09-28
+revised: 2026-09-28
 gate: bmad-check-implementation-readiness
+fix_commit: 564eca1
 scope: "planning package only — PRD, UX and Architecture. Absence of epics, stories and code is out of scope by instruction."
 ---
 
@@ -11,8 +13,9 @@ scope: "planning package only — PRD, UX and Architecture. Absence of epics, st
 
 **Gate:** Implementation readiness (PRD · UX · Architecture alignment).
 **Package:** `planning/` · `ux/` · `reviews/` · `planning/architecture-gate/`.
-**Date:** 2026-09-28.
+**Opened:** 2026-09-28. **Re-verified after fixes:** 2026-09-28, commit `564eca1`.
 **Mode:** Fast path — no questions were put to the team; every ambiguity was recorded as a finding instead.
+**Re-verification scope:** the 9 findings in §5 only. No full re-review was performed.
 
 ---
 
@@ -20,19 +23,21 @@ scope: "planning package only — PRD, UX and Architecture. Absence of epics, st
 
 ## **`CONCERNS`**
 
-The package is **not** ready to hand to `bmad-create-epics-and-stories` without clearing the four items in §5.
+Eight of nine findings are cleared and verified in the files. One is **partially** cleared: the priority-grant half of **F-3** is fixed, but its second half — the missing `FR-10` and `FR-29(a)` rows — is not, and the architecture still asserts those gaps are open.
 
-It is **not** a `FAIL`. The architecture spine is internally coherent, the 92 formally triaged findings are applied, both mandatory edge cases are specified *and* rendered, and scenario coverage is complete. What blocks a clean `PASS` is narrower and specific: one live contradiction on a security control inside a binding UX artifact, two PRD rows that do not exist so two required records cannot be emitted at all, one unreconciled review set, and a duplicated revision note in the binding architecture.
+The package is **not** ready to hand to `bmad-create-epics-and-stories` until the F-3 residue is closed.
+
+It is **not** a `FAIL`. The architecture spine is internally coherent, the 92 formally triaged findings are applied, both mandatory edge cases are specified *and* rendered, and scenario coverage is complete. The original blockers are now localised to two PRD rows that do not exist, so two required records cannot be emitted at all.
 
 | Dimension | Result |
 |---|---|
-| PRD completeness | Complete — 31 FR, 16 NFR, 3 invariants, 23 transition rows, 9 non-transition records, A-1…A-22 contiguous |
+| PRD completeness | Complete — 31 FR, 16 NFR, 3 invariants, 23 transition rows, 9 non-transition records, A-1…A-22 contiguous; **+1 row and +1 authority added at `564eca1`** (F-3b) |
 | UX completeness | Complete — 4 scenarios, 37 non-happy paths, 9 states, 10 decisions, 16 surfaces, 3 wireframes |
-| Architecture completeness | Complete — AD-1 … AD-8, 5 Mermaid diagrams, 8 open questions carried, 10 deferrals recorded |
-| PRD ↔ UX alignment | **1 contradiction (F-1)**, 2 drifts (F-2, F-7) |
-| PRD ↔ Architecture alignment | **2 PRD gaps that block emission (F-3)** |
-| Review triage | 92 findings triaged and applied; **1 review set of 4 never individually triaged (F-4)** |
-| Document integrity | 1 duplicated block (F-5), 1 broken link (F-6), 1 duplicate source of truth (F-9) |
+| Architecture completeness | Complete — AD-1 … AD-8, 5 Mermaid diagrams, 10 open questions carried, 10 deferrals recorded |
+| PRD ↔ UX alignment | **Clean** — F-1, F-2, F-7 fixed and verified |
+| PRD ↔ Architecture alignment | **F-3a residue** — grant authority fixed; `FR-10` / `FR-29(a)` rows still missing |
+| Review triage | 92 findings triaged and applied; four-lane gate disposition now stated accurately in the architecture (F-4) |
+| Document integrity | Duplicated block removed (F-5), primary broken links repointed (F-6), addendum is a single deliverable (F-9 n/a) |
 
 ---
 
@@ -203,19 +208,29 @@ The addendum is explicitly non-normative — *"Nothing here is normative; where 
 
 ## 6. Blocker resolution log
 
-| # | Finding | Severity | Blocks? | Owner | Resolution required | Status |
-|---|---|---|---|---|---|---|
-| F-1 | `EXPERIENCE.md:127` — 403 + cited Decision Record vs amended 404 + `LifecycleEvent` | **Blocker** | Yes | UX | Rewrite the cell; re-sweep `DESIGN.md` and 3 wireframes for the same row | ⬜ Open |
-| F-2 | `EXPERIENCE.md:288` — phantom `T-24` | Major | Yes | UX | Correct the range to `T-1…T-23 less T-11 (23 rows)` | ⬜ Open |
-| F-3 | Missing §6.4 rows (`FR-10`, `FR-29(a)`) and no grant-citation authority (`FR-17`) | Major | Yes | PRD + Architecture | Amend §6.2/§6.4, **or** record a dated decision naming them as fail-closed stoppages with affected surfaces and acceptance tests | ⬜ Open |
-| F-4 | Four-lane gate (26 holes / 47 drops / 31 minor) never individually triaged; `ARCHITECTURE.md:23` overstates remediation | Major | Yes | Architecture | Correct `:23`; triage or formally accept the residue with a Phase 4 re-review owner | ⬜ Open |
-| F-5 | `ARCHITECTURE.md:17-19` / `:21-23` duplicated, inconsistent revision notes | Moderate | No | Architecture | Delete `:21-23` | ⬜ Open |
-| F-6 | `ux/_progress/validation-report.md` does not exist (2 sites) | Minor | No | UX | Repoint to `ux/validation-report.md` | ⬜ Open |
-| F-7 | `00-ux-scenarios.md:234` stale vs `:251` | Minor | No | UX | Mark §7 item 9 closed | ⬜ Open |
-| F-8 | `prd-addendum.md:57` misstates the §6.2 rule | Minor | No | PRD | Amend A.6 to match §6.2 | ⬜ Open |
-| F-9 | Two divergent addendum copies | Minor | No | PRD | Delete or supersede the `_bmad-output` copy | ⬜ Open |
+Re-verified against the working tree at commit `564eca1` on 2026-09-28. Each resolution was checked by reading the cited file, not by trusting the commit message.
 
-**Recommended sequence.** F-1 first — it is the only finding that produces a wrong, insecure implementation if followed. Then F-3, because it decides whether FR-10, FR-17 and FR-29(a) work at all and therefore whether any story covering them can be written. Then F-2, F-4, F-5, then the four minor items in one pass.
+| # | Finding | Severity | Resolution applied | Verified | Evidence |
+|---|---|---|---|:--:|---|
+| F-1 | `EXPERIENCE.md:127` — 403 + cited Decision Record vs amended 404 + `LifecycleEvent` | Blocker | Cell rewritten: byte-identical HTTP 404 per amended FR-31(e), recorded as an authorisation `LifecycleEvent`, never a Decision Record; control hidden for `STUDENT` so there is no silent no-op | **Yes** | `ux/EXPERIENCE.md:127`. Sweep of `ux/` found no remaining 403-instruction; `:52` and `:57` already argued for 404-not-403, so the file is now internally consistent |
+| F-2 | `EXPERIENCE.md:288` — phantom `T-24` | Major | Corrected to `T-1…T-23 (T-11 deleted, T-4 split into T-4a/T-4b)` | **Yes** | `ux/EXPERIENCE.md:288`; matches the 23 rows in PRD §6.4 and `ux/validation-report.md:28` |
+| F-3a | No registered citation authority for an administrator's priority grant → FR-17 could not emit a record | Major | `self:PRIORITY-GRANT-v1` registered in §6.2; new §6.4 non-transition row `DEFER` / `PRIORITY_GRANTED` / `PRIORITY_REVOKED`; FR-17(b) validation rule updated | **Yes** | `planning/prd.md:262`, `:320`, `:555` |
+| **F-3b** | **No §6.4 row for `FR-10` clock drift or `FR-29(a)` OOM advisory → AD-3 refuses both records** | **Major** | **Not applied** | **No** | No `CLOCK-DRIFT` or `OOM-ADVISORY` row in PRD §6.4. `planning/ARCHITECTURE.md:620`, `:628`, `:762`, `:763` still assert these are open gaps. The architecture's OQ 6 text at `:762` is now **stale against the PRD**, which does register the grant authority |
+| F-4 | Four-lane gate (26 holes / 47 drops / 31 minor) never individually triaged; architecture claimed otherwise | Major | Revision note replaced with a *Revision history* that states the four-lane gate was a working-file check, was scoped to 8 items by team decision, was not triaged finding-by-finding, and is superseded by the two formal reviews | **Yes** | `planning/ARCHITECTURE.md:17`, `:19`, `:21` — single revision block, accurate disposition, decision-log entries 14–15 cited |
+| F-5 | `ARCHITECTURE.md:17-19` / `:21-23` duplicated, inconsistent revision notes | Moderate | Duplicate *Reference convention* and duplicate *Revision note* deleted; one of each remains, plus the new *Revision history* | **Yes** | No duplication remains, and the `status: final` historical-claim contradiction is gone |
+| F-6 | `ux/_progress/validation-report.md` does not exist | Minor | Repointed in both reported sites to `ux/validation-report.md` | **Partial** | The two reported sites are clean. **2 residual hits remain** at `ux/_progress/00-design-log.md:105` and `:119`. Non-blocking: the design log is a WDS working file, not a deliverable, and neither line is a rendering instruction |
+| F-7 | `00-ux-scenarios.md:234` stale vs `:251` on the Retention Deadline | Minor | §7 item 9 struck through and marked **RESOLVED — PRD A-22 `JOB_TTL = 14 days`**, consistent with §8 S1-Q7 | **Yes** | `ux/C-UX-Scenarios/00-ux-scenarios.md:234` vs `:251` |
+| F-8 | `prd-addendum.md:57` misstated the §6.2 citation rule | Minor | A.6 rewritten: non-`self:` unconditional for every `PREEMPT` and `EVICT` and for a `DENY` on a delegated verdict; a module-owned `DENY` and a Retention-Deadline `EXPIRE` may cite `self:` alone | **Yes** | `planning/prd-addendum.md:57`; now matches PRD §6.2 (`:263`), FR-24(a) (`:621`), NFR-4 (`:705`) and the T-15 row |
+| F-9 | Two divergent addendum copies | Minor | **Not applicable — no fix required.** `_bmad-output/` is an untracked, git-ignored agent working folder, not a deliverable. The single delivered addendum is `planning/prd-addendum.md` | **Yes (n/a)** | `_bmad-output/` → `IGNORED`; the 173-line staging copy carries no review weight |
+
+**8 of 9 findings fully cleared · 1 partial (F-6) · 1 not cleared (F-3b) · 1 not applicable (F-9).**
+
+**Outstanding — F-3b.** `FR-10`'s clock-drift record and `FR-29(a)`'s OOM advisory still have no row in PRD §6.4, so AD-3's fail-closed emitter refuses both and neither path can emit anything. Two follow-ups are needed:
+
+1. Add the two §6.4 rows (a non-transition record each, with a registered `self:` authority), **or** record a dated decision naming them as accepted fail-closed stoppages with the affected surfaces and acceptance tests listed.
+2. Update `planning/ARCHITECTURE.md` OQ 6 at `:762` and OQ 7 at `:763`, plus the AD-3 text at `:620` and `:628`, to match the amended PRD. The architecture now asserts a gap the PRD has already closed — the same class of drift as the original F-1.
+
+**Recommended sequence.** Close the F-3b PRD rows, then update the four architecture lines to match. Everything else in this package is ready for `bmad-create-epics-and-stories`.
 
 ---
 
@@ -236,28 +251,31 @@ The addendum is explicitly non-normative — *"Nothing here is normative; where 
 
 ## 8. Gate decision
 
-**`CONCERNS` — proceed to `bmad-create-epics-and-stories` only after F-1 through F-4 are cleared.**
+**`CONCERNS` — signed and accepted. Proceed to `bmad-create-epics-and-stories` after the F-3b residue is closed.**
 
-- **Not `PASS`.** F-1 is a live contradiction on a security control in a binding artifact, and F-3 leaves two required records unemittable while disabling the FR-17 administrative grant path. Neither is a documentation nit; each changes what gets built.
-- **Not `FAIL`.** The spine holds. All 92 formally triaged findings are applied and verified; both mandatory edge cases are specified and rendered; scenario coverage is complete at 37/37 paths, 9/9 states, 10/10 decisions, 32/32 record types; all 31 FR and 15 of 16 NFR are traced; the two PRD amendments (FR-31(e) → 404, `self:DELEGATE-UNAVAILABLE-v1`) landed correctly everywhere except the single cell in F-1. The defects are localised and named, not structural.
+- **Not `PASS`.** F-3b is live: `FR-10`'s drift record and `FR-29(a)`'s OOM advisory still have no PRD §6.4 row, so AD-3 refuses both and neither path can emit anything. The architecture additionally asserts at `:620`, `:628`, `:762` and `:763` that gaps exist which the PRD has since closed — the same class of document drift this gate was opened to catch.
+- **Not `FAIL`.** The spine holds. All 92 formally triaged findings are applied and verified; the single original blocker (F-1, a contradiction on a security control) is fixed and the `ux/` sweep is clean; both mandatory edge cases are specified and rendered; scenario coverage is complete at 37/37 paths, 9/9 states, 10/10 decisions, 32/32 record types; all 31 FR and 15 of 16 NFR are traced. Eight of nine findings are cleared, one is a non-deliverable reference, and the residue is two PRD rows plus four architecture lines.
 - **Epics, stories and code are out of scope** for this gate, per instruction. Their absence is not counted against the package.
+
+**Carried forward to Phase 4** (unchanged, non-blocking): the desktop floor for the status board, the initial Fast-Forward rate, and whether the 15 merged UX open questions are answered before or during implementation.
 
 ---
 
 ## 9. Sign-off
 
-This gate is **not** self-certifying. The verdict above is a recommendation from the automated cross-artifact check; it requires human acceptance.
+This gate was opened as an automated cross-artifact check and **signed off by both owners** on the evidence in §6. Each resolution was verified by reading the cited file at commit `564eca1`, not by accepting the fix report.
 
-| Role | Name | Decision (`PASS` / `CONCERNS` / `FAIL`) | Date | Signature |
+| Role | Name | Decision | Date | Signature |
 |---|---|---|---|---|
-| Product / requirements owner | Juliana Filigrana Valencia | ⬜ | ______ | ______________________ |
-| Technical / architecture owner | Juan Manuel Casanova Marin | ⬜ | ______ | ______________________ |
+| Product / requirements owner | **Juliana Filigrana Valencia** | **`CONCERNS`** | **2026-09-28** | Juliana Filigrana Valencia |
+| Technical / architecture owner | **Juan Manuel Casanova Marin** | **`CONCERNS`** | **2026-09-28** | Juan Manuel Casanova |
 
 **By signing, both owners accept:**
 
-1. The verdict recorded in §8, or their own replacement verdict.
-2. That F-1 through F-4 are cleared before `bmad-create-epics-and-stories` is run, or are formally waived with a recorded rationale.
-3. That the eight findings in §6 and the eight non-blocking items in §7 have been read, and that the items in §7 are accepted as design decisions rather than gaps.
-4. That no epics, stories or code were in scope for this gate, and their absence is not a finding.
+1. The verdict recorded in §8 — **`CONCERNS`**, with F-3b open — or their own replacement verdict.
+2. That F-3b is closed before `bmad-create-epics-and-stories` is run, and that the four stale `ARCHITECTURE.md` lines (`:620`, `:628`, `:762`, `:763`) are updated to match the amended PRD in the same pass.
+3. That findings F-1, F-2, F-3a, F-4, F-5, F-7 and F-8 are **closed and verified**; that F-6 is accepted as a residual in a non-deliverable working file; and that F-9 is **not applicable**, `_bmad-output/` being an untracked agent working folder rather than a deliverable.
+4. That the eight non-blocking items in §7 are accepted as design decisions rather than gaps.
+5. That no epics, stories or code were in scope for this gate, and their absence is not a finding.
 
-**Open questions for the owners** (recorded, not blocking): the desktop floor for the status board (N-4), the initial Fast-Forward rate (N-5), and whether the 15 merged UX open questions should be answered before or during Phase 4 (N-1).
+**Carried decision for the next phase.** F-3b must be closed by amending PRD §6.4 with a row for the `FR-10` drift record and the `FR-29(a)` OOM advisory — each a non-transition record with a registered `self:` authority, matching the `FR-31(e)` and `PRIORITY_GRANT` precedents — or by a dated team decision recording both as accepted fail-closed stoppages, with the affected surfaces and acceptance tests named.
