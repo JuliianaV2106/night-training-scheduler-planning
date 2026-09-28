@@ -54,7 +54,7 @@ The adopted model splits the two concerns: **aging guarantees access, authority 
 
 **The alternative.** A decision may cite only this module's own invariants — simpler, and every citation is guaranteed resolvable.
 
-**Why rejected.** A user whose job was stopped at dawn deserves to know *which delegated authority said so*, not merely that the scheduler felt like it. PRD §6.2 requires at least one non-`self:` citation for `DENY`, `PREEMPT`, `EVICT`, and `EXPIRE`, so every consequential decision points outward to a system that can be independently asked. `self:` remains legitimate for time and self-integrity rules, where no external authority exists.
+**Why rejected.** A user whose job was stopped at dawn deserves to know *which delegated authority said so*, not merely that the scheduler felt like it. PRD §6.2 requires at least one non-`self:` citation for every `PREEMPT` and `EVICT` and for a `DENY` based on a delegated verdict (a module-owned `DENY` and a Retention-Deadline `EXPIRE` may cite `self:` alone), so every consequential decision points outward to a system that can be independently asked. `self:` remains legitimate for time and self-integrity rules, where no external authority exists.
 
 **Note the deliberate asymmetry:** `ADMIT` may cite `self:` alone. A job that runs does not owe the user an appeal trail; a job that is stopped does.
 

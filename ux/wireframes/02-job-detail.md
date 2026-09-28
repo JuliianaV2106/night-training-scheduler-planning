@@ -98,7 +98,7 @@ Reproduced exactly as authored in `planning/prd.md` §6.3. **Nothing is reworded
 
 > ✅ **Resolved 2026-09-28:** `[V]` found that PRD §6.3 stamped this citation `…05:44:58Z` (UTC, five hours before the eviction). The PRD was corrected to `…05:44:58-05:00`, two seconds before the 05:45:00 decision, and this wireframe follows it.
 >
-> *Original finding:* ⚠ **Finding for `[V]` — the §6.3 citation carries the wrong UTC offset.** The record's `sim_timestamp` is `2026-10-04T05:45:00-05:00`, but its `node-state:M3/…` citation is stamped `@2026-10-04T05:44:58Z`. A `Z` suffix is UTC: `05:44:58Z` is `00:44:58-05:00` local — **five hours before** the eviction, not the two seconds before it that the "last health reading" requires. The `Z` is almost certainly a typo for `-05:00`. **It is rendered verbatim here and not corrected**, because a source citation is never silently rewritten; the defect is carried to `ux/_progress/validation-report.md` for the PRD's owner.
+> *Original finding:* ⚠ **Finding for `[V]` — the §6.3 citation carries the wrong UTC offset.** The record's `sim_timestamp` is `2026-10-04T05:45:00-05:00`, but its `node-state:M3/…` citation is stamped `@2026-10-04T05:44:58Z`. A `Z` suffix is UTC: `05:44:58Z` is `00:44:58-05:00` local — **five hours before** the eviction, not the two seconds before it that the "last health reading" requires. The `Z` is almost certainly a typo for `-05:00`. **It is rendered verbatim here and not corrected**, because a source citation is never silently rewritten; the defect is carried to `ux/validation-report.md` for the PRD's owner.
 
 ---
 

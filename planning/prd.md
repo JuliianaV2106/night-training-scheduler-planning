@@ -258,6 +258,8 @@ Citations are drawn only from delegated sources, formatted `authority:identifier
 - `self:CHECKPOINT-QUARANTINE-v1` — FR-20, the verification discipline and the Checkpoint Quarantine (T-12, T-13).
 - `self:RECONCILIATION-v1` — FR-9, missed-window reconciliation after a daemon restart (T-18).
 - `self:CHECKPOINT-STORE-BUDGET-v1` — NFR-13, the Checkpoint store ceiling.
+- `self:CLOCK-AUTHORITY-v1` — FR-10, the single Daemon Clock and its 1 s drift latch (readiness gate F-3).
+- `self:PRIORITY-GRANT-v1` — FR-17, an administrative priority grant or revocation; the actor and reason code are in `inputs` (readiness gate F-3).
 - `self:DELEGATE-UNAVAILABLE-v1` — FR-6, FR-8(e): a required delegated verdict (M1, M2, M3, M4, M5 or M8) is unavailable; reason `DELEGATE_UNAVAILABLE`; the record names the unavailable authority in `inputs`. Permitted alone because no delegated authority exists to cite (architecture edge-case review E-5).
 
 **The split rule (F-1):** a `DENY` may be justified solely by `self:` **only when the reason is a module-owned rule** — the scope boundary (FR-3), Max Night Span (FR-4), the queue cap (FR-7), or Job Spec validation (FR-2); likewise an `EXPIRE` on a Retention Deadline (FR-7(b), T-15) may cite `self:RETENTION-DEADLINE-v1` alone, because retention is a module-owned bookkeeping rule with no delegated authority to name. A `DENY` whose reason is a **delegated verdict** (Modules 1, 2, 5, or 8) may not; it needs at least one non-`self:` citation naming the verdict. **Every `PREEMPT` and `EVICT` requires at least one non-`self:` citation, unconditionally.** `self:` is otherwise legitimate only for time and self-integrity rules. A denial, preemption, or eviction of a user's work may never be justified solely by a time or bookkeeping reason.
@@ -314,6 +316,9 @@ Citations are drawn only from delegated sources, formatted `authority:identifier
 | FR-16(c) — a refused Preemption | `DEFER` | `PREEMPTION_REFUSED` | `self:PREEMPTION-MARGIN-v1` (OQ-1) |
 | FR-20(f) — a resume not verified by 21:59:00 | `DEFER` | `UNVERIFIED_RESUME` | `self:CHECKPOINT-QUARANTINE-v1` — an unverified resume is never admitted |
 | FR-23(c) — a Cordon Request | `CORDON` | `CHECKPOINT_WRITE_FAILED` | `node-state:M3/…`; `self:EVICTION-RAMP-v1` |
+| FR-10 — drift latched / cleared (fleet-level, `job_id: null`) | `DEFER` | `CLOCK_DRIFT_LATCHED` / `CLOCK_DRIFT_CLEARED` | `self:CLOCK-AUTHORITY-v1` |
+| FR-17 — priority grant or revocation by `LAB_ADMIN` | `DEFER` | `PRIORITY_GRANTED` / `PRIORITY_REVOKED` (actor + reason code in `inputs`) | `self:PRIORITY-GRANT-v1` |
+| FR-29(a) — OOM advisory | — | — | Not a separate record: the remediation (lower batch size or a 48 GB node) is carried in the `summary` and `inputs` of the T-23 `FAIL` record with reason `OOM_KILLED`. |
 
 **Notes.**
 
@@ -547,7 +552,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **System responsibility:** Ensure priority is a governed resource and cannot be self-allocated.
 **Trigger:** A priority grant, a self-declared intent at submission, or a revocation.
 **Inputs:** Actor identity from Module 1; actor role; target `job_id`; reason code.
-**Validation rules:** (a) only a role the lab administrator recognises may set Granted Priority — and a Urgent Grant is scoped **per job**, not per submitter per window `[ASSUMPTION: A-13]`; (b) setting `URGENT` requires a non-empty reason code and is written to the Decision Record with the actor; (c) a self-declared intent is stored as a request visible to the administrator and never applied; (d) revoking a grant takes effect at the next Admission Order computation and never aborts a `RUNNING` job.
+**Validation rules:** (a) only a role the lab administrator recognises may set Granted Priority — and a Urgent Grant is scoped **per job**, not per submitter per window `[ASSUMPTION: A-13]`; (b) setting `URGENT` requires a non-empty reason code and is written to a Decision Record (`PRIORITY_GRANTED`, `self:PRIORITY-GRANT-v1`, PRD §6.4) with the actor; (c) a self-declared intent is stored as a request visible to the administrator and never applied; (d) revoking a grant takes effect at the next Admission Order computation and never aborts a `RUNNING` job.
 **Outputs:** The grant, revocation, or recorded request; the Decision Record.
 **Testable condition:** A student submitting with `declared_intent: THESIS` receives `granted_priority: EXPLORATION` until an administrator grants otherwise, and the Decision Record shows the request as `PENDING_REVIEW`; a grant of `URGENT` without a reason code is rejected; revoking `URGENT` does not stop the already-`RUNNING` job.
 
