@@ -5,7 +5,7 @@ Paquete de planificación asistida por IA (BMad + WDS) para el módulo **Night T
 ## Authors
 
 - Juliana Filigrana Valencia
-- Juan Manuel Casanova
+- Juan Manuel Casanova Marin
 
 ## Estructura
 
