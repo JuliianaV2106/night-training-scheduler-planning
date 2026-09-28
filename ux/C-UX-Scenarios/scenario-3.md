@@ -143,7 +143,7 @@
 
 - **T-6 fires.** Decision `EVICT`. Citations `self:EVICTION-RAMP-v1` **and** `node-state:M3/…` (the Node's last health reading). The non-`self:` citation is unconditional: **every `EVICT` and every `PREEMPT` requires at least one non-`self:` citation, without exception** (FR-24(a), NFR-4, F-1). A user's work being stopped may never be justified solely by a time or bookkeeping reason.
 - **The slot flips to `draining` and stays held.** Invariant S-1 permits a hold in `CHECKPOINTING` until 06:00:00, and `draining` exists in the slot vocabulary *because* this window is where the module's hardest cases happen. A board that showed such a slot as `available` would be lying during the most safety-critical eight minutes of the night.
-- **The countdown on a `draining` tile is Ramp-scoped.** Inside the Eviction Ramp, where the deadline is real, the tile reads `draining - SIGKILL in mm:ss` counting to 05:53:00. **Outside the Ramp the deadline is the 300 s Checkpoint Budget, not a wall-clock instant** — so at a 23:10 preemption the tile reads `draining - checkpointing` with elapsed seconds and no SIGKILL reference. A `draining` tile that always showed a 05:53:00 countdown would be quoting a deadline that does not exist at 23:10.
+- **The countdown on a `draining` tile has exactly three branches, and which one applies is decided by the Simulated Clock instant.** Inside the Eviction Ramp, where the deadline is real, the tile reads `draining · SIGKILL in mm:ss` counting to 05:53:00. Outside the Ramp the deadline is the 300 s Checkpoint Budget, not a wall-clock instant — so at a 23:10 preemption the tile reads `draining · checkpointing · elapsed ‹n›s / 300s` with no SIGKILL reference. A `draining` tile that always showed a 05:53:00 countdown would be quoting a deadline that does not exist at 23:10. **And after 05:53:00, a slot still held is OVERDUE** — see the branch spelled out under SURF-02 deltas below, because this scenario is where it is reachable.
 - **The `draining` hue is shared with `CHECKPOINTING`, deliberately.** `{colors.node-draining}` = `{colors.state-checkpointing}`: a draining slot is running a `CHECKPOINTING` job. The operator learns one vocabulary rather than two.
 - **The `CHECKPOINTING` badge** additionally shows whether the write is inside the 300 s Checkpoint Budget (05:45:00–05:50:00) or the 05:50:00–05:53:00 reserve. **The reserve is still usable** (FR-19(b), F-7) — a Checkpoint verified any time before 05:53:00 satisfies T-8 — so the surface must not present the reserve as expired.
 - **Per-Node release is independent and immediate** (FR-19(d)). Each Node's allocation is released on that job's exit, **not** at 05:53:00. A board that held every slot until the hard deadline would report jobs as still held minutes after their allocations were returned — and UJ-2's own activation puts 22 job assignments on the board, so the divergence is large enough to see at a glance.
@@ -315,7 +315,27 @@ Carried as a near-miss in NP-3.1 rather than as a failure. Restated because it i
 
 ## Page Specifications
 
-> **Phase 4 — WDS UX design.** Canonical specifications for **SURF-06** (administrator shell), **SURF-06a** (Cordon clearance), **SURF-07** (Node detail), **SURF-08** (Quarantine release), plus **deltas** to SURF-04 Job detail, SURF-04b Decision Record detail and SURF-05 Event log. `scenario-1.md` owns SURF-04/04b and `scenario-2.md` owns SURF-05; this file specifies only what the dawn Ramp adds to them. Sources, in precedence order: `planning/prd.md` → `ux/EXPERIENCE.md` → `ux/DESIGN.md` → this section. Conventions are stated once in `scenario-1.md`.
+> **Phase 4 — WDS UX design.** Canonical specifications for **SURF-06** (administrator shell), **SURF-06a** (Cordon clearance), **SURF-07** (Node detail), **SURF-08** (Quarantine release), plus **deltas** to SURF-02 Board, SURF-04 Job detail, SURF-04b Decision Record detail and SURF-05 Event log. `scenario-1.md` owns SURF-04/04b and `scenario-2.md` owns SURF-02/SURF-05; this file specifies only what the dawn Ramp adds to them. Sources, in precedence order: `planning/prd.md` → `ux/EXPERIENCE.md` → `ux/DESIGN.md` → this section. Conventions are stated once in `scenario-1.md`.
+
+### SURF-02 deltas — the OVERDUE branch, 05:53:00 → 06:00:00
+
+`scenario-2.md` SURF-02.3 specifies the Ramp countdown as Ramp-scoped. **This section specifies what the board does in the seven minutes that Ramp-scoped rendering alone leaves blank, and it is the delta this scenario owns** — because a clean dawn and a morning that failed to reach one are indistinguishable on a board that has no OVERDUE state.
+
+**The case.** A `CHECKPOINTING` job is still holding its slot at 05:53:00, so the SIGKILL missed. The realistic cause is NP-3.8: the daemon is dead at 05:53 and restored at 05:56. Invariant S-1 *permits* the hold until 06:00:00, so the slot is still legal — but the deadline the Ramp set has passed, and nothing on the board says so.
+
+**The three branches, as one chain** (`DESIGN.md` `node-slot-tile`; `EXPERIENCE.md` `draining`):
+
+| Instant | Tile | Token | Glyph + text |
+|---|---|---|---|
+| 05:45:00 → 05:53:00 | `draining · SIGKILL in mm:ss` | `{colors.node-draining}` | `▼` + `draining` |
+| any pre-Ramp drain (e.g. 23:10 preemption) | `draining · checkpointing · elapsed ‹n›s / 300s` | `{colors.node-draining}` | `▼` + `draining` |
+| **after 05:53:00, still held** | **`SIGKILL overdue +mm:ss`** | **`{colors.state-rejected}`** | **`!` + `SIGKILL overdue`** |
+
+- **Branch 3 is the first and only time a *slot* borrows a job-state hue.** It is permitted only because the glyph and the literal words travel with it, which is the same NFR-15 discipline the job badges use. A slot that turned red at 05:54 with no words would be indistinguishable from a cordoned slot and would be a new, undocumented sixth state.
+- **A board-wide adverse `decision-banner` is raised alongside it**, citing **`self:EVICTION-RAMP-v1`** and naming the held slot(s). `scenario-2.md` SURF-02.6's banner table is the registry; this row is the one the dawn scenario contributes to it.
+- **At 06:00:00 the banner escalates.** With any hold still outstanding it names the **Invariant S-1 / NFR-14 violation** explicitly, and **stays until the hold clears** — no auto-dismiss, per the module's no-time-limited-content rule. The escalation carries the meaning: *before* 06:00:00 the hold is permitted and the banner says the SIGKILL was missed; *at* 06:00:00 it stops being permitted and the banner says that too. A banner that expired at the moment the breach stopped being true is a banner that hid the breach.
+- **The clock is not the deadline the tile quotes.** The tile reads the Simulated Clock; if the daemon is unreachable, branch 3 cannot update, and the board is in the connection state below rather than in OVERDUE — the two are distinguished the way `scenario-2.md` SURF-02.6 distinguishes a Module 2 `freeze` from an unreachable daemon. A frozen tile at 05:56 is `Daemon unreachable — data may be stale`, not a clean dawn.
+- **E-9 interaction:** the minimum-dwell rule guarantees branch 2 is visible before branch 3, so the operator sees a slot *become* overdue rather than finding it already red.
 
 ### SURF-06.1 The administrator shell
 
@@ -343,7 +363,7 @@ The PRD names no morning-handoff surface. What it *does* name is a set of facts 
 | **Health** | The last Module 3 reading, the reading's `sim_timestamp`, and the transition-time failure points (FR-23(d)(1)(2) calls out kubelet eviction and disk errors specifically). |
 | **Current cordons** | Every active cordon with its **cause string**, the incident instant, and the state of the outbound Cordon Request. |
 | **Cordon / Clear cordon** | The single mutation this surface owns. `LAB_ADMIN` only. |
-| **Assigned jobs** | Occupants of the Node's slots. |
+| **Assigned jobs** | Occupants of the Node's slots. **A 2-GPU job on `server-gpu-01` is listed ONCE**, not once per slot — it is one job holding both, and a list showing it twice is a list asserting two independent occupants. Its row carries `2 × 48 GB · slots 0–1`. |
 | **History** | Events for this Node, linking to SURF-05. |
 
 **Clearing a cordon is the panel's only write.** One verb, one actor, one irreversible-ish consequence — so Node detail is a **read surface plus exactly one action**, and every other affordance is a link. The panel it opens is SURF-06a.
@@ -411,14 +431,15 @@ The **`fsync` the parent directory** step is called out by name and given equal 
 - **The 300 s Checkpoint Budget and the 05:50:00–05:53:00 reserve render as two distinct phases** on the `CHECKPOINTING` badge. **The reserve is still usable** (FR-19(b), F-7) — a Checkpoint verified any time before 05:53:00 satisfies T-8 — so nothing in the UI may present the reserve as expired or degraded. It is the safety margin, and the surface says so.
 - **The completion record supersedes, visibly.** T-8 keeps `decision: EVICT` and sets `supersedes` to the T-6 record id, mirroring T-6's citations. Rendered as a `supersedes ‹decision_id›` link above the eyebrow in SURF-04b. Records are immutable and append-only, so a revised decision is a new record linked to its predecessor — **never an edit**.
 
-**Ramp-scoped vs budget-scoped countdown — the rule that makes `draining` honest.**
+**Ramp-scoped vs budget-scoped countdown — the rule that makes `draining` honest.** Three branches, not two; the third is the OVERDUE case specified in § SURF-02 deltas above and summarised here so the Job-detail frame and the Board frame cannot disagree.
 
-| Context | Tile text |
-|---|---|
-| **Inside the Eviction Ramp** (deadline real) | `draining · SIGKILL in mm:ss`, counting to 05:53:00 |
-| **Outside the Ramp** (e.g. a 23:10 preemption) | `draining · checkpointing · elapsed ‹n›s / 300s`, **no SIGKILL reference** |
+| Context | Tile text | Token |
+|---|---|---|
+| **Inside the Eviction Ramp** (deadline real) | `draining · SIGKILL in mm:ss`, counting to 05:53:00 | `{colors.node-draining}` |
+| **Outside the Ramp** (e.g. a 23:10 preemption) | `draining · checkpointing · elapsed ‹n›s / 300s`, **no SIGKILL reference** | `{colors.node-draining}` |
+| **After 05:53:00, still held** | **`SIGKILL overdue +mm:ss`**, plus the adverse board banner | `{colors.state-rejected}` |
 
-FR-19(d) and Invariant S-1 govern the dawn Ramp, where a slot may be held until 06:00:00. FR-16(d) pins **no** deadline on a preemption drain (**S3-Q2**), and the Checkpoint Budget (A-9) is defined as the 300 s window *inside* the Ramp. A `draining` tile that always quoted a 05:53:00 countdown would be quoting a deadline that does not exist at 23:10 — so **the countdown is Ramp-scoped and the budget is not**.
+FR-19(d) and Invariant S-1 govern the dawn Ramp, where a slot may be held until 06:00:00. FR-16(d) pins **no** deadline on a preemption drain (**S3-Q2**), and the Checkpoint Budget (A-9) is defined as the 300 s window *inside* the Ramp. A `draining` tile that always quoted a 05:53:00 countdown would be quoting a deadline that does not exist at 23:10 — so **the countdown is Ramp-scoped and the budget is not**. Equally, a tile that kept counting *to* 05:53:00 past 05:53:00 would be counting toward an instant that is behind it, which is the third branch.
 
 **`EVICTED_RESUMABLE` and `FAILED` must never be confusable.** The single most important rendering decision in this scenario. A clean dawn eviction is **the module working correctly**:
 

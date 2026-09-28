@@ -78,7 +78,7 @@
 | FR | What it constrains in this scenario |
 |---|---|
 | **FR-1** | Submit a Training Job. Outputs `job_id`, admitted state, Pending Set position, projected first-start estimate, Retention Deadline, and a Decision Record with `ADMIT` or `DENY`. HTTP 201 on success. |
-| **FR-2** | Validate the Job Spec. Per-field `pass` or `rule_id` + human-readable message, rules (a)–(j). |
+| **FR-2** | Validate the Job Spec. Per-field `pass` or `rule_id` + human-readable message, rules (a)–(k). |
 | **FR-4** | Estimate duration, enforce Max Night Span, required VRAM. Produces `estimated_duration_s`, `estimated_completion_nights`, `required_vram_gb`, `admitted_nights`, `max_night_span`, `confidence`. |
 
 ### Supporting
@@ -302,7 +302,7 @@ Twelve fields, all grounded in the §3 Job Spec definition plus the FRs that nam
 |---|---|---|---|---|
 | 1 | `container_image` | text, digest | **(a)** | Must be pinned by digest, not tag. `sha256:` + 64 hex. `:latest` fails (NP-1.2). |
 | 2 | `worker_count` | integer | FR-1(d), FR-3(a) | `= 1`. `replicas = 1` in the same group. **Checked first** — see SURF-01.4. |
-| 3 | `gpus_per_node` | select | **(b)** | `1` or `2`. `2` is legal only on a 48 GB-class Node — `server-gpu-01` is the only one, and the selector reflects that rather than offering 2 GPUs on a 24 GB workstation. |
+| 3 | `gpus_per_node` | select | **(b), (k)** | `1` or `2`. **`2` is legal only with a 48 GB-class target — `server-gpu-01` is the only Node with two slots** (A-19, F-42). The 2-GPU option is offered, not hidden, because FR-2(b) admits it; what the surface refuses is the **combination**, and that refusal is a field error on this field. See rule (k) below. |
 | 4 | `required_vram_gb` | select | **(c)** | Must not exceed the largest single-Node VRAM class, **48 GB**. `server-gpu-01` carries two 48 GB slots; each `ws-gpu-NN` carries one 24 GB slot (§3, F-42). |
 | 5 | `resources` | paired `requests` / `limits` | **(d)** | Must be **equal** for GPU and memory, because quota accounting reads `requests`. Rendered as two inputs with an inline "must match" rule; a mismatch is a per-field rejection, never a silent normalisation. |
 | 6 | `node_selector` | select | **(e)** | Optional. If present it must name a Node matching the declared VRAM class. Renders the 32 fixed ids, `ws-gpu-01` … `ws-gpu-31` and `server-gpu-01` (`A-4`), in `{typography.mono-data}`. |
@@ -335,6 +335,16 @@ Two rendering classes, never merged:
 | (g) | `checkpoint_interval_minutes` | must be a positive integer ≤ 30 |
 
 Rule (c) names both halves on purpose: a 70B-class job on a 24 GB workstation is infeasible for a reason the reader needs in full. Rule (g) carries its reason in helper text, because the 30-minute ceiling is the Checkpoint Budget's arithmetic and not an arbitrary limit. `reason: VALIDATION_FAILED`, `decision: DENY`, citation `self:JOBSPEC-VALIDATION-v1`.
+
+**Rule (k) is a fourth per-field rejection, and it is the one that exists because of edge-case review E-3.** It is stated as a field error on `gpus_per_node` rather than as a banner, because it is a Job Spec field rule like (a) and (c), and a reader who typed it can fix it by typing something else.
+
+| Rule | Field | Message carries |
+|---|---|---|
+| **(k)** | **`gpus_per_node`** | **`2 GPUs` is valid only with a 48 GB-class target — `server-gpu-01`. `server-gpu-01` has 2 slots; `ws-gpu-NN` has 1.** Citation `self:JOBSPEC-VALIDATION-v1`, naming rule (k). |
+
+**Why the field is not merely constrained by the selector.** `gpus_per_node = 2` with `required_vram_gb = 24` satisfies FR-2(b) and FR-2(c) individually, and the only thing that makes it unplaceable is the **`node_selector` pinning** — `ws-gpu-14`, which has one slot. Before rule (k) that job was admitted into the Pending Set and then silently unplaceable: it aged, it was promoted by FR-14(d), it appeared in the Admission Order as a `DEFER` with `CAPACITY_EXHAUSTED`, and **no reason ever surfaced on the form, because the form had already returned 201**. A job that is refused at 14:30 costs a student one edit; a job that is admitted at 14:30 and never runs costs her a night, and tells her nothing. The message names the **slot count of the specific Node pinned**, not just the class, because the class is what she has already read in the selector and the slot count is the fact that is actually blocking her.
+
+**Rule (k) is deliberately *not* one of the three simultaneous rejections in FR-2's testable condition** — that condition is (a), (c) and (g) on a `worker_count = 1` spec and is left exactly as the PRD states it. Rule (k) is an additional branch in the same class, and the surface must therefore be able to render (a) + (c) + (g) + (k) at once without collapsing any of them.
 
 **(b) Whole-request refusals** — a `decision-banner` at the top of the work region, in the form's light theme. Five distinct branches, none of which may be folded into another:
 
@@ -417,7 +427,7 @@ This is the whole of FR-17(c), and it is load-bearing: priority is the only reso
 
 - WCAG 2.1 AA per NFR-15. `{colors.text-primary-light}` on `{colors.surface-base-light}` is 15.79:1; `{colors.text-muted-light}` is 5.33:1; the nine `-light` state tokens are 4.57–7.39:1. The binding pair in the whole light set is `{colors.state-checkpointing-light}` at 4.87:1 on base.
 - Each field's error is programmatically associated with its input via `aria-describedby`, so the message is announced with the field rather than being found by reading the page.
-- **A new Decision Record is announced.** The banner carries `role="alert"` on first appearance, because UJ-1's submission refusal is one of the two highest-stakes records in the module's flows and a screen-reader user who submits and hears nothing cannot tell success from failure. Once present the banner is a navigable region, not a live region, and never re-announces on repaint.
+- **A new Decision Record is announced.** The banner carries a `role="status"` node on first appearance, **escalated to `aria-live="assertive"` because it is an adverse decision on the viewer's own job** — one of the three reserved cases, and the one UJ-1 exists to exercise. A screen-reader user who submits and hears nothing cannot tell success from failure. Once present the banner is a navigable region, not a live region, and never re-announces on repaint.
 - Every reason code is real text in `{typography.mono-label}`, never an image and never an `aria-label` that paraphrases it.
 - Focus order matches reading order. No banner auto-dismisses and no time-limited content exists on this surface.
 - `prefers-reduced-motion` is satisfied vacuously: this surface has no change animation, and the only permitted console animation is a 120 ms background wash.
@@ -563,7 +573,7 @@ Row actions are revealed on **hover and on keyboard focus equally**. A row actio
 ### SURF-04.9 Accessibility
 
 - WCAG 2.1 AA (NFR-15). Every state carries colour **and** glyph **and** text label.
-- **Live regions are scoped to the smallest stable node.** A job *state* change announces as `JOB-0417 Queued` — never a bare state name, never a colour. A new Decision Record gets `role="alert"` on first appearance in the focused surface; once present the banner is a navigable region and never re-announces on repaint.
+- **Live regions are scoped to the smallest stable node.** A job *state* change announces as `JOB-0417 Queued` — never a bare state name, never a colour. A new Decision Record gets `role="status"` (polite) on first appearance in the focused surface, **escalated to assertive only when it is an adverse decision on the viewer's own job**; once present the banner is a navigable region and never re-announces on repaint.
 - **Focus never moves on a background poll.** If the view recomputes while focused, the change is announced and the focus stays put.
 - Every detail panel returns focus to its opener at the preserved scroll offset. An operator auditing five jobs in sequence must never lose their place, and a panel that drops focus to `<body>` on close sends the next `Tab` back to the top of the frame.
 - Citations are **real text** — selectable, copyable, in `{typography.mono-label}`. An `aria-label` that summarises a citation defeats the point of the §6 contract.

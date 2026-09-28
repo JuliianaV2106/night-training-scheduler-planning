@@ -42,8 +42,8 @@
 │              │   ws-gpu-07   ws-gpu-08   ws-gpu-09   ws-gpu-10   ws-gpu-11   ws-gpu-12  …    │  │
 │              │  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐         │  │
 │              │  │▼ DRAIN │  │○ FREE  │  │○ FREE  │  │○ FREE  │  │○ FREE  │  │○ FREE  │         │  │
-│              │  │  1/61s │  │        │  │        │  │        │  │        │  │        │         │  │
-│              │  │ 4m 39s │  │        │  │        │  │        │  │        │  │        │         │  │
+│              │  │SIGKILL │  │        │  │        │  │        │  │        │  │        │         │  │
+│              │  │ 6m 59s │  │        │  │        │  │        │  │        │  │        │         │  │
 │              │  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘         │  │
 │              │   …                                                                             │  │
 │              │   ws-gpu-19                                                                              │
@@ -55,8 +55,10 @@
 │              │   …                                                                             │  │
 │              │   server-gpu-01                                                                           │
 │              │  ┌────────┐  ┌────────┐                                                                 │
-│              │  │○ FREE  │  │○ FREE  │  1 × 48 GB   2 × 48 GB                                              │  │
-│              │  └────────┘  └────────┘                                                                 │
+│              │  │○ FREE  │  │○ FREE  │  1 × 48 GB   2 × 48 GB   ·   a 2-GPU job here renders as    │
+│              │  └────────┘  └────────┘                ONE SPANNING TILE, not two tiles (E-3)    │
+│              ├─────────────────────────────────────────────────────────────────────────────────┤
+│              │  accessible name: server-gpu-01 slots 0–1, running, …, ‹job_id›                   │
 │              └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -88,7 +90,7 @@
 |---|---|---|
 | `held` | **0** | no slot holds a `RUNNING` job at 05:46:01 — SIGTERM reached all 22 placements at 05:45:00 |
 | `reserved` | **0** | no Module 4 reservation overlaps this window |
-| `draining` | **1** | `ws-gpu-07` — still `CHECKPOINTING` at 61 s of its 300 s budget |
+| `draining` | **1** | `ws-gpu-07` — SIGTERM at 05:45:00, still `CHECKPOINTING` at 05:46:01, counting to the 05:53:00 SIGKILL |
 | `cordoned` | **1** | `ws-gpu-19` — released at 05:46:01, locally not-Eligible |
 | `idle` | **31** | 20 released placements + 11 never-placed slots |
 | | **33** | |
@@ -132,19 +134,21 @@ Both are `decision-banner` instances at the SURF-04.6 anatomy: eyebrow · summar
 
 ## 5. The three tiles that carry the design
 
-### `ws-gpu-07` — `draining`
+### `ws-gpu-07` — `draining`, inside the Ramp
 
 ```
   ┌──────────────┐
   │ ▼  DRAINING  │     occupancy:  ▼  ·  label "DRAINING"
-  │  1/61s       │     {colors.node-draining} = {colors.state-checkpointing}
-  │  4m 39s      │     + 1px {colors.border-structure} edge
+  │ SIGKILL in   │     {colors.node-draining} = {colors.state-checkpointing}
+  │   6m 59s     │     + 1px {colors.border-structure} edge
   └──────────────┘
   accessible name:
-    ws-gpu-07 slot 1, draining, occupied by another job, checkpointing 61 of 300 seconds
+    ws-gpu-07 slot 1, draining, occupied by another job, SIGKILL in 6 minutes 59 seconds
 ```
 
-- **The countdown is budget-scoped, not Ramp-scoped-looking.** The tile shows *elapsed against the 300 s Checkpoint Budget*. The SIGKILL instant is carried **once, in the status strip** — where it belongs — so the tile is not quoting a deadline twice.
+- **The countdown is Ramp-scoped, because 05:46:01 is inside the Ramp.** The tile counts to the **05:53:00 SIGKILL** — `SIGKILL in 6m 59s` — and 6m 59s is the same number the status strip carries. An earlier draft of this wireframe showed the tile counting `1/61s` of the 300 s Checkpoint Budget while this very file's own spine said *inside the Ramp, count down to 05:53:00*; that was the contradiction **E-4** found, and the tile is redrawn to the single rule. Three branches, one chain, in `DESIGN.md` `node-slot-tile`: **inside the Ramp** → SIGKILL countdown; **during a Preemption at 23:10** → the 300 s Checkpoint Budget; **after 05:53:00 while still held** → `SIGKILL overdue` in `{colors.state-rejected}` with `!`, plus the board banner. A fourth branch is not available.
+- **The Checkpoint Budget is not lost by moving it off the tile — it is carried by the `CHECKPOINTING` job badge**, which states whether the write is inside the 300 s Budget (05:45:00–05:50:00) or the 05:50:00–05:53:00 reserve. At 05:46:01 that badge reads *Budget · 61 s of 300 s used*. Two surfaces, one fact each: the tile answers *when does the daemon kill it*, the badge answers *am I still inside the budget I was given*.
+- **Not OVERDUE, and that is a real distinction rather than a default.** OVERDUE begins **after** 05:53:00. This tile is 6m 59s early, so it stays `{colors.node-draining}` — red on a slot at 05:46:01 would be a state that means nothing, and the branch that does mean something is specified in `scenario-3.md` § SURF-02 deltas.
 - `ws-gpu-07` is **not Kavita's job**, so FR-31(b) applies: the `job_id` is **absent**, replaced by `occupied by another job` with no identifier to mask (**D-b**).
 
 ### `ws-gpu-19` — released, cordoned, and the reason is legible
@@ -176,7 +180,7 @@ Both are `decision-banner` instances at the SURF-04.6 anatomy: eyebrow · summar
 - **An idle slot is never blank, at any hour** (FR-25(d), unconditional). The reason string is not a tooltip; it is in the accessible name.
 - The reason here is a timestamp, because this slot was *released by the Ramp* — different information from a slot that was never occupied, and the tile should not flatten the two.
 
-> ⚠ **Finding for `[V]` — the reason vocabulary has a hole.** The six codes in `EXPERIENCE.md`'s Reason panel (`M3_CORDONED`, `M4_RESERVED`, `VRAM_CLASS_INSUFFICIENT`, `NO_ELIGIBLE_NODE`, `CAPACITY_EXHAUSTED`, `PRIOR_NODE_INELIGIBLE`) all describe **why a Node was excluded**. None describes a slot that was **Eligible, free, and simply not needed** — the `ws-gpu-21…31` case at 22:00, and every slot here at 05:46. The wireframe renders `FREE` and the timestamp, which is honest, but **`FREE` is not a PRD reason code** and a code for *surplus capacity* is missing from the spine. Carried to `ux/_progress/validation-report.md`; not invented here.
+> ✓ **Resolved — `[V]`, the reason-vocabulary hole.** The six codes in `EXPERIENCE.md`'s Reason panel all describe **why a Node was excluded**. None described a slot that was **Eligible, free, and simply not needed** — the `ws-gpu-21…31` case at 22:00, and every slot here at 05:46. `FREE` is FR-25(d)'s own code and is now the **seventh** in the spine's Reason panel, leading the list because it carries no delegated authority. The wireframe's `FREE` is no longer rendering a code the spine lacks.
 
 ---
 
@@ -185,6 +189,7 @@ Both are `decision-banner` instances at the SURF-04.6 anatomy: eyebrow · summar
 **No horizontal scroll, ever.** 33 tiles × 44px = **1452px**, which already exceeds a 1440px viewport before one gap and before the left rail. A board whose right edge is off-screen cannot answer *are all GPUs released* — the first thing Ines checks at 07:00. The production layout therefore **wraps into node-labelled row groups**; the grid above is shown in 8 columns for width.
 
 - `role="grid"`, **one row per Node, one cell per GPU slot**, roving `tabindex` — the grid is **one tab stop**. `server-gpu-01` is announced as two slots of one node and reached with `←`/`→`.
+- **The spanning tile is one entity over two cells**, name `server-gpu-01 slots 0–1, …` — `spans slots 0–1` **replaces** `slot ‹n›` rather than joining it (E-3). This frame shows both slots `FREE`, so no span is drawn here; the note is on the pair so the reader knows what the pair looks like when it is occupied.
 - Every cell name is `‹node_id› slot ‹n›, ‹occupancy label›, ‹eligibility label if any›, ‹job_id or reason›` — four fields, because a name that can hold only one attribute is a name that lies.
 - **Every state carries colour *and* glyph *and* text label** (NFR-15). Glyphs are `aria-hidden` throughout: a `⚡` announced as "high voltage" and a `⏸` announced as "check mark button" are worse than no glyph.
 - Tile **44px height floor, no width floor**; the ordinal, glyph and state label never leave the tile, and the `job_id` truncates to 8 characters visually while staying whole in the accessible name.
@@ -207,6 +212,11 @@ Both are `decision-banner` instances at the SURF-04.6 anatomy: eyebrow · summar
 | Roll-up format | scenario 2 step 1, verbatim |
 | Bucket precedence | **D-a**, `00-design-log.md` §5 |
 | `draining` never idle | **D-c**, Invariant S-1 |
+| `ws-gpu-07` counts to 05:53:00, not the 300 s budget | **E-4** — three-branch rule, `DESIGN.md` `node-slot-tile`; redrawn here |
+| `FREE` as a 7th reason code | FR-25(d), **E-12** — closes the `[V]` finding below |
+| `SIGKILL overdue` exists for a hold surviving 05:53:00 | **E-2**, NFR-14 / Invariant S-1; `scenario-3.md` § SURF-02 deltas |
+| `draining` is always rendered, never coalesced away | **E-9** minimum-dwell rule, `EXPERIENCE.md` Simulated Clock |
+| Slot state never renders without its Decision Record | **E-11** atomic delivery, `EXPERIENCE.md` Explainability Contract |
 | Foreign `job_id` suppressed | FR-31(b), **D-b** |
 | `FAIL` banner red, `FAILED` badge pink | DESIGN.md conflict **#4** |
 | Tile edge token | DESIGN.md conflict **#1** — `{colors.border-structure}` |

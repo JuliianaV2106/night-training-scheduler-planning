@@ -173,7 +173,7 @@
 
 **Every delegated verdict consulted appears in T-1's citation list, and every one is shown on the banner** — an admitted job carries the same citation discipline as a refused one, because SM-5's target is *100%* of decisions presented to a user, absolute.
 
-**Errors are `role="alert"`; success is `aria-live="polite"`.** A student using a screen reader must hear a refusal. A refused form that changes silently is a form that will be submitted again unchanged.
+**Refusals are `aria-live="assertive"`; success is `role="status"` (polite).** A student using a screen reader must hear a refusal. A refused form that changes silently is a form that will be submitted again unchanged. **The asymmetry is the three-case assertive reservation in `EXPERIENCE.md`**: every refusal on this surface is an adverse decision on the viewer's own job — the job she is submitting, about which nothing was queued — so all of them are assertive, and none of them is someone else's record. On the board, a 22-placement activation is polite, because it is not about the viewer.
 
 **Nothing is submitted without a decision.** There is no optimistic-accept path and no "we'll check and email you": the `DENY` in §1 is the response, and it is the response the PRD's testable condition asserts.
 
@@ -186,7 +186,7 @@
 | **Loading** | Per-field skeletons at final geometry; the submit button shows a 1px `{colors.border-structure}` border and a 20px-wide indeterminate bar. **The form never greys out wholesale** — a student must be able to read and correct a field while a delegated verdict is in flight. |
 | **Empty** | The form renders with declared-timeout defaults and no error treatment. Empty is a legitimate starting point, not a failure. |
 | **Error — field** | Inline beneath the field, `{typography.label-sm}`, glyph `✕` + text. **Never a red border alone**, and never a red border on a field whose value is *valid but over a ceiling*. |
-| **Error — delegated authority** | `role="alert"`, naming the module and the fact that its verdict is missing. **The form does not proceed on an unresolved authority** — the module never invents an `ALLOW` (A-15, OQ-1). |
+| **Error — delegated authority** | Announces **assertively** — an adverse decision on the viewer's own submission. Naming the module and the fact that its verdict is missing. **The form does not proceed on an unresolved authority** — the module never invents an `ALLOW` (A-15, OQ-1). |
 | **Error — daemon** | `Daemon unreachable — data may be stale` in the strip; the form stays filled, the draft persists, and the submit button is `aria-disabled` but **not dimmed**. **A student who loses a typed 52-hour spec to a network blip has lost an evening's work**, so the draft autosaves locally. |
 | **Success** | The `ADMIT` banner, and the Pending Set entry at `QUEUED_PENDING_WINDOW` with its position. **No confetti, no green flood** — the admission is a state, and it is stated as one. |
 
@@ -194,7 +194,7 @@
 
 ## 5. Accessibility · the refusal specifically
 
-- **The 52 h refusal is the highest-stakes record a student will ever see**, alongside a refused Preemption. It carries a `role="alert"` node **on first appearance**: a screen-reader user who is refused and hears nothing cannot tell refusal from silence.
+- **The 52 h refusal is the highest-stakes record a student will ever see**, alongside a refused Preemption. It announces **assertively on first appearance** — an adverse decision on the viewer's own job, one of the three reserved cases — because a screen-reader user who is refused and hears nothing cannot tell refusal from silence.
 - **Summary ≤ 200 characters** (§6.1). SM-C4: a longer summary is not a better one. The banner summary above is 197 characters; the refusal's *reasoning* lives in the four scope-reduction options beneath it, not in a longer sentence.
 - **The form is fully keyboard-operable and never validates on blur-then-submits-twice.** `Enter` in any field submits once. A second submission cannot be produced by a keypress, because a duplicate `DENY` is a duplicate Decision Record and the record log is the module's audit trail.
 - **Light theme only.** The submission form is the one surface where a student arrives without prior context, often on a shared machine, in daylight. `{colors.text-primary}` on `{theme.light.bg.base}` is 16.1:1, and every field label is above 4.5:1.
@@ -214,7 +214,7 @@
 | Usable Night Duration 7 h 45 min, 22:00–05:45 | FR-2(i)(b), F-15 |
 | Night Window exactly 8 h, America/Bogota, no DST | §4 glossary; decision D-1; F-31 |
 | The four scope reductions | FR-4(c) |
-| Validation rules (a)–(j) | FR-2 |
+| Validation rules (a)–(k) | FR-2 — **(k)** is the 2-GPU/48 GB rule from E-3; see `scenario-1.md` SURF-01.4 |
 | `checkpoint_interval_minutes` ≤ 30 | FR-2(g), F-17 |
 | Requests == limits for GPU and memory | FR-2(d) |
 | Declared intent is `PENDING_REVIEW`, not applied | FR-14(c), FR-17(c) |

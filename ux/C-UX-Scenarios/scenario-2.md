@@ -287,6 +287,7 @@ Nine. Activation has the deepest failure surface in the module because it is the
 - **No horizontal scroll, ever.** The arithmetic is the reason and it is worth stating: 33 tiles at 44px is 1452px, which already exceeds a 1440px viewport before a single gap and before the left rail. A board whose right edge is off-screen cannot answer *are all GPUs released* — the first thing Ines checks at 07:00. The board therefore **wraps into labelled rows of slots**, one row group per node, with a `{typography.mono-label}` node header above each group.
 - The tile keeps a **44px height floor with no width floor** (`{components.node-slot-tile.size}`). As the tile narrows, the ordinal, glyph and state label stay on it; the `job_id` moves into the accessible name and the slot inspector, truncated to 8 characters visually.
 - `server-gpu-01` renders as a **paired tile with a shared node header above both slots**. The two slots are visually independent inside the pair — slot 0 `running` and slot 1 `reserved` is a legal and common display, because the node is one machine and Ines reasons about the machine, while the slots are genuinely different facts.
+- **The one exception is the spanning tile.** FR-2(k) admits `gpus_per_node = 2` only on a 48 GB class, so a 2-GPU job occupies **both** slots of `server-gpu-01` — the only Node with two. It renders as **ONE tile spanning both cells**, carrying the `job_id` and the second line **`2 × 48 GB`**, in the single occupancy state that job holds (`running` / `draining` / `available`). Drawing it as two independent tiles would assert that either slot could be released, which is exactly what a 2-GPU job does not permit. **A reservation mark still applies to the pair** — FR-12(b) makes it a Node-level fact — so a spanning tile may read `running · reserved`.
 - Row gap `{spacing.1}` (4px) within a node group, `{spacing.panel-gap}` (12px) between groups, `{spacing.gutter}` (16px) from the region gutter.
 - Tiles reflow narrower; they never scroll.
 
@@ -319,7 +320,8 @@ Always mounted, above the slot grid, and the direct answer to *are all GPUs free
 ```
 
 - Counts are computed **per slot and never per node**. The roll-up is the aggregate of the same per-slot data the tiles show, so a wrong roll-up would be a wrong board.
-- **Bucket precedence — design decision D-a (`ux/_progress/00-design-log.md` §5).** Each slot counts exactly once, in the order `held → draining → reserved → cordoned → idle`. A slot that is **idle and cordoned counts as `cordoned`**, so the operator sees the condition on the roll-up; its per-slot reason string still shows its occupancy. The PRD fixes the roll-up's *format* (step 1) but never says which axis wins when a slot carries both attributes. **Flagged for review** — the alternative is that an idle+cordoned slot counts as `idle`, which reads as a healthier board.
+- **Slots and jobs are separate axes, and both are shown.** FR-2(k) admits `gpus_per_node = 2`, so **one job can hold two slots** — and a roll-up of pure slot counts renders that as two placements. The slot buckets are the PRD's axis and never become a job count; a job figure rides alongside: **`2 slots · 1 job held`**. The axis is named in the string precisely so a reader does not have to infer which one she is looking at.
+- **Bucket precedence — design decision D-a (`ux/_progress/00-design-log.md` §5).** Each slot counts exactly once, in the order `held → draining → reserved → cordoned → idle`. A slot that is **idle and cordoned counts as `cordoned`**, so the operator sees the condition on the roll-up; its per-slot reason string still shows its occupancy. The PRD fixes the roll-up's *format* (step 1) but never says which axis wins when a slot carries both attributes. **Flagged for review** — the alternative is that an idle+cordoned slot counts as `idle`, which reads as a healthier board. **A spanning tile contributes 2 slots and 1 job**, and takes the precedence bucket of its single occupancy state.
 - **The roll-up is never the only place a count appears.** Every count it shows is also derivable from the tiles.
 
 ### SURF-02.5 Idle slots and the fleet-level sentence
@@ -333,7 +335,7 @@ Always mounted, above the slot grid, and the direct answer to *are all GPUs free
 
 **The two are a summary over a constant invariant, not alternatives: the sentence is a roll-up, the reasons are the data.** A night that admits zero jobs must never look like a rendering failure.
 
-**Exclusion reason codes, verbatim** (`EXPERIENCE.md` Reason panel): `M3_CORDONED`, `M4_RESERVED`, `VRAM_CLASS_INSUFFICIENT`, `NO_ELIGIBLE_NODE`, `CAPACITY_EXHAUSTED`, `PRIOR_NODE_INELIGIBLE`. Each renders in a `reason-panel` as the code at `{typography.mono-label}` plus one human sentence — the component that makes FR-25(d) expressible.
+**Exclusion reason codes, verbatim** (`EXPERIENCE.md` Reason panel), **seven**: `FREE` · `M3_CORDONED` · `M4_RESERVED` · `VRAM_CLASS_INSUFFICIENT` · `NO_ELIGIBLE_NODE` · `CAPACITY_EXHAUSTED` · `PRIOR_NODE_INELIGIBLE`. `FREE` is not an exclusion but it is in the same vocabulary, because it is the reason an outside-the-window slot carries and the same `reason-panel` renders it. Each renders as the code at `{typography.mono-label}` plus one human sentence — the component that makes FR-25(d) expressible.
 
 **`reserved` is a Node-level fact applied to every slot of that Node**, so both slots of `server-gpu-01` go `reserved` together. F-42's per-slot independence governs job *occupancy*, not an eligibility rule the PRD states at Node granularity (FR-12(b): a Node whose reservation interval overlaps the Night Window is not Eligible **for the whole window**).
 
@@ -348,6 +350,9 @@ All are `decision-banner` instances at the SURF-04.6 anatomy, mounted above the 
 | **Emergency freeze** | FR-6(c) — Module 2 reports a `freeze` | the freeze state | `policy:M2/…` — a delegated verdict, so `self:` alone is **not** permitted | adverse |
 | **Latched clock drift** | FR-10 — drift beyond 1 s, 1 Hz check | the drift fault | the drift rule | adverse |
 | **Checkpoint store pressure** | NFR-13 / FR-22(d) — store over `CHECKPOINT_STORE_BUDGET` | `DISK_PRESSURE_ESCALATION` | `self:CHECKPOINT-STORE-BUDGET-v1` | adverse |
+| **SIGKILL overdue** | a slot is **still held after 05:53:00** — typically NP-3.8, the daemon dead at 05:53 and restored at 05:56 | the missed SIGKILL, and the held slot(s) | `self:EVICTION-RAMP-v1` | adverse |
+
+**The SIGKILL-overdue banner escalates and does not dismiss.** At **06:00:00, with any hold still outstanding, it names the Invariant S-1 / NFR-14 violation** and stays until the hold clears. Between 05:53:00 and 06:00:00 the hold is still *permitted*, so the banner says the SIGKILL was missed; at 06:00:00 it stops being permitted, and the banner says that. It pairs with the OVERDUE tile branch specified in `scenario-3.md` § SURF-02 deltas, and no surface auto-dismisses it.
 
 **The Missed Night Window banner renders in the same place the board would have said activation succeeded.** A board showing 33 released slots after a skipped window is indistinguishable from a clean dawn, and FR-14(d) ageing quietly changes the Admission Order behind that. It states the missed window and the next attempt.
 
@@ -377,9 +382,18 @@ All are `decision-banner` instances at the SURF-04.6 anatomy, mounted above the 
 | **Error** | `Daemon unreachable — data may be stale` with the last-received-update `sim_timestamp`, controls `aria-disabled` but **not dimmed to 40%** — at that opacity `{colors.text-secondary}` composites to 2.40:1, and a control the operator cannot read is the vanished control this design refuses to create. Automatic retry. **No slot, badge or counter updates while in this state**; last known values stay visible and marked stale, because the surface must never imply the fleet changed while data was stale. This is a **UI state, not a job state** — no job or node state is added and the PRD needs no amendment. |
 | **Success** | The board settles with **no flash and no celebratory treatment**. The success signal is the countdown marker and the tiles reaching their terminal state. The single permitted change animation is a 120 ms background wash on the changed tile; `prefers-reduced-motion` replaces it with a 1px `{colors.border-structure}` border on **the tile and the row**. |
 
+**The render queue — coalescing merges slots, never states.** At 1440× the board coalesces so it does not queue 1440 renders per second, and the cost of coalescing is that a slot can pass `running → available` inside a single 500 ms window and never be seen `draining` — a state the Event log holds and Invariant S-1 enforced for its whole duration. So:
+
+- **Every state a slot passes through is rendered for ≥ 250 ms of real time, at every rate**, via a **per-slot render queue**: a slot's pending state is not replaced until it has been on screen ≥ 250 ms.
+- **Coalescing may merge updates across slots; it may never skip a state on one slot.** Thirty-three slots repaint in one pass; one slot does not jump a step.
+- **`draining` is therefore always visible**, which is what makes the OVERDUE branch in `scenario-3.md` reachable by a human rather than only by the log.
+- **The dwell sits inside NFR-9's ≤ 500 ms bound**: 250 ms of dwell means a state is *first shown* well inside the budget; the dwell delays only its *replacement*. A rate change does not flush a queue — the pending state is a state the engine passed through, and rendering it is the accurate thing to do.
+- **A state and its Decision Record are committed and delivered in the same batch, and the two are never separated.** FR-24 requires a cited record for every transition, and the render queue is where that requirement becomes enforceable: the engine emits `(new_state, record)` as **one** message, and the queue replaces a pending update only when the whole pair is available. **A tile may never show a state the Event log holds no record for** — a `draining` slot with no `EVICT` record beside it is an operator reading a state with no reason and no citation, which is exactly the unexplained transition the Event log exists to prevent. A deferred record holds back its state with it; a "state only" retry is equally forbidden.
+
 ### SURF-02.8 Board — accessibility
 
 - `role="grid"` with **one row per Node and one cell per GPU slot**, so `server-gpu-01` is announced as two slots of one node and is reachable with `←`/`→` — the only way to reach slot 1 from slot 0. Roving `tabindex`, so the grid is **one tab stop**.
+- **The spanning tile is one accessibility entity covering two cells**, and its name **replaces** the per-slot field: **`server-gpu-01 slots 0–1, ‹occupancy label›, ‹eligibility label if any›, ‹job_id or reason›`**. `spans slots 0–1` is not additive — a name that also said `slot 0` would be two names for one tile, and one of them false. `aria-colspan` covers the span in the grid geometry.
 - **Each cell's accessible name is `‹node_id› slot ‹n›, ‹occupancy label›, ‹eligibility label if any›, ‹job_id or reason›`** — four fields, because a name that can hold only one attribute is a name that lies. For a slot held by another submitter's job the last field reads `occupied by another job` with **no identifier at all** (FR-31(b)). A `‹cause›` string on a cordoned slot is included unabbreviated.
 - Every state glyph carries `aria-hidden="true"` — in the grid, in the `status-badge` and in the clock control. A `⚡` announced as "high voltage" and a `⏸` announced as "check mark button" are worse than no glyph, and the label is already carrying the meaning.
 - `↑`/`↓` move between tiles; `Home`/`End`/`PgUp`/`PgDn` traverse; `Enter` opens **Node detail**; `g n` operates on the focused tile.
@@ -397,11 +411,31 @@ All are `decision-banner` instances at the SURF-04.6 anatomy, mounted above the 
 | **Last-received-update `sim_timestamp`** | `{typography.mono-data}` with explicit offset. Persists while unreachable; that is the point of it. |
 | **Simulated clock** | `{typography.mono-data-lg}` — one of exactly three permitted uses of that face. **With its explicit UTC−05:00 offset**, so a simulated instant can never be confused with a wall-clock one. `aria-live="off"` per tick, readable on demand. |
 | **Rate control** | SURF-02b. |
-| **Countdown to next decision point** | `05:45:00` after activation. `aria-live="off"` per tick. **It stops at 05:53:00 and stays visible** — no time-limited content anywhere in this console. |
+| **Countdown to next decision point** | `05:45:00` after activation. `aria-live="off"` per tick. **It stops at 05:53:00 and stays visible** — no time-limited content anywhere in this console. **Its target is defined at every instant of the night** as a single ordered chain, below. |
+
+**The countdown's target — one ordered chain, and the first entry still in the future is the answer.** An earlier draft named the target at only two instants, which left five of the seven states an operator spends the night in with no defined countdown at all.
+
+| # | Target | Instant |
+|---|---|---|
+| 1 | Pre-verification begins | **21:30:00** (§7.5 — all 33 slots verified by 21:59:00) |
+| 2 | Window Activation | **22:00:00** (FR-8(a)) |
+| 3 | FR-8(e) retry | **every 5 simulated minutes, to 04:00:00** — each attempt its own cited `DEFER` |
+| 4 | Eviction Ramp | **05:45:00** (FR-19(a)) |
+| 5 | SIGKILL | **05:53:00** (FR-19(a); the reserve is still usable, F-7) |
+| 6 | Invariant S-1 check | **06:00:00** — after this a held slot is a violation, not a permitted hold |
+| 7 | Next pre-verification | **next 21:30:00** |
+
+**Three states replace the number:**
+
+- **Paused** → the countdown **freezes and is labelled `paused`**. The number still names the target, so the operator knows where she is parked; it does not keep decreasing, because a ticking countdown against a stopped clock reports an instant that is not approaching.
+- **Daemon unreachable** → the countdown is **replaced by `last update ‹time›`**, never a stale countdown. A number pointing at a decision point the daemon has not confirmed it will reach may be wrong about the future, and the transport state is what the surface actually knows.
+- **Entry 6 reached with a hold still outstanding** → `05:53:00 passed · Invariant S-1 check failed`, pairing with the OVERDUE tile and the escalating board banner in `scenario-3.md`. At that point the countdown is not a clock; it is a status.
 | **A-3 simulation disclaimer** | Un-dismissable, in the strip. The honesty constraint is global: v1 models no real GPU, no container execution, no telemetry and no model weights. |
 | **Run panel entry** | `LAB_ADMIN` only — SURF-10. |
 
-**Live regions are scoped to the smallest stable node**, and the reason is quantitative: `aria-live` on the whole strip would announce every child mutation, and politeness controls interruption priority, **not announcement rate** — so a region changing many times per second at 1440× still queues many utterances and drowns the assertive channel. Therefore: the per-tick clock and countdown are `aria-live="off"`; a separate throttled node announces the simulated instant **at most once per 30 s**; `aria-live="assertive"` is **reserved for daemon-unreachable and latched drift only**; the queue-depth counter is `aria-live="off"` per tick with one polite announcement when it crosses `QUEUE_DEPTH_CAP`.
+**Live regions are scoped to the smallest stable node**, and the reason is quantitative: `aria-live` on the whole strip would announce every child mutation, and politeness controls interruption priority, **not announcement rate** — so a region changing many times per second at 1440× still queues many utterances and drowns the assertive channel. Therefore: the per-tick clock and countdown are `aria-live="off"`; a separate throttled node announces the simulated instant **at most once per 30 s**; **Decision Records are `role="status"` (polite) by default**; and `aria-live="assertive"` is **reserved for exactly three cases** — **daemon-unreachable · latched drift · an adverse decision (`DENY` `PREEMPT` `EVICT` `FAIL` `EXPIRE`) on the viewer's own job.** The queue-depth counter is `aria-live="off"` per tick with one polite announcement when it crosses `QUEUE_DEPTH_CAP`.
+
+**Priority within the reserved set, and why it is stated.** When two announcements are simultaneous, **connection state is announced first**: a record presented on top of stale data is a record about a fleet that may no longer be in that state. Assertive on *every* record was the defect this replaces — it made a 22-placement activation compete with itself at 22:00:00 and buried the two connection-level cases under a backlog of records nobody needed interrupting for. See `EXPERIENCE.md` Accessibility Floor.
 
 **At 1440× the countdown and clock update on every drained transition batch, not on a timer**, so they never disagree with the data below them. NFR-9 bounds a committed transition's visibility at ≤ 500 ms of real time **at every rate**, so the board updates on a fixed cadence that does not scale with the rate and coalesces at 1440× rather than queueing 1440 renders per second.
 
@@ -422,9 +456,13 @@ All are `decision-banner` instances at the SURF-04.6 anatomy, mounted above the 
 | **What it does show** | The **reconciliation count**, so an operator can watch event fidelity hold across a rate change. |
 | **When unreachable** | The whole cluster is `aria-disabled="true"` and **not dimmed**; unavailability is carried by the label and the ARIA state, never by opacity alone. |
 
-**Jump-to-instant** — `j` while the clock has focus. Offers **`21:59:00` and `05:44:00` as one-key presets** plus free entry, because those are the two instants an operator actually needs: 21:59:00 is the pre-verification budget deadline (§7.5 — every resume in the fleet fully verified by then, worst case all 33 slots within 29 minutes from 21:30:00), and 05:44:00 is the last second before the Eviction Ramp.
+**Jump-to-instant** — `j` while the clock has focus. Offers **`21:59:00` and `05:44:00` as one-key presets** plus free entry. **Both are 60 s before the instant they exist to watch**: 60 s before the 22:00:00 Activation, and 60 s before the 05:45:00 Eviction Ramp. The rationale is a **distance, not a superlative** — an earlier draft called 05:44:00 "the last second before the Eviction Ramp", which is wrong by a factor of 60 (the last second before the Ramp is 05:44:59), and a preset that overstates its own precision is a preset an operator distrusts on the day it matters.
+
+**A preset jump auto-pauses on arrival; a free-entry jump does not.** At 1440× a simulated minute is 42 ms of real time, so a jump to 60 s before the Ramp followed by an unpaused 1440× runs the whole approach — and the pre-verification phase, and the Ramp — in under three seconds. The operator pressed a key to *look at* a moment and the moment elapsed while the key was still coming up. So the preset leaves her **paused at the target instant with the board stable**, and she resumes at a rate of her choosing, with **1× recommended** beside the control. The recommendation is text, not enforcement: FR-11(b) leaves pacing entirely to the operator. **Free entry does not auto-pause** — a typed instant is an operator who has said where she wants to be and how fast she wants to get there; only the presets promise a moment to watch, so only the presets promise the pause.
 
 **A jump drains every transition at or before the target instant before rendering** (FR-28(c)). The board is never shown mid-drain, because a half-applied window is exactly the state an operator would misread.
+
+**There is no rewind, and the console says so.** FR-11 and NFR-7 make the simulator a **forward-only discrete-event engine** with deterministic replay from a seed, so simulated time never moves backwards. A jump to an instant earlier than the current clock is **not** a rewind and **not** a slow jump: it is **a new run from the same seed** — `POST /simulations` with the original seed, replaying deterministically to the target instant. The distinction is load-bearing rather than cosmetic. Un-applying committed transitions is impossible, because records are immutable and append-only; forking the run in place is possible, and that is exactly what a new seeded run is. **The control therefore offers no backwards affordance, and the run panel states the alternative** — anyone who asks for a rewind is asking for the second thing, and it has a name.
 
 **Shortcuts are inert while a text field has focus** — `1`–`4`, `Space`, `0`, `g`, `n`, `j` and `?`. The digest field of SURF-01 is hex and contains `1`–`5` and `0`, so without the guard typing a 64-character digest fires the rate control four times with no undo, on a live run. A shortcut that can fire while someone is typing an identifier is a data-loss bug wearing a keyboard shortcut.
 
@@ -433,6 +471,8 @@ All are `decision-banner` instances at the SURF-04.6 anatomy, mounted above the 
 ## SURF-03 — Admission Order
 
 **Route:** `g a`, or the Activation panel on the Board. **Persona:** `LAB_ADMIN` only — absent from `Kavita`'s navigation entirely, not merely disabled. A hidden affordance beats a `403` on click.
+
+**A hidden affordance is not an access control, so the route is closed too.** `g a` is **not registered for `STUDENT`** — the sequence does not resolve, so pressing it moves focus rather than navigating. A direct navigation to this route by a `STUDENT` renders **the same "not found" page as a foreign `job_id`**: **404, not 403**, because a `403` confirms the resource exists and discloses that a real Admission Order ran tonight. See `EXPERIENCE.md` Information Architecture for why the three `LAB_ADMIN` surfaces are closed as one rule.
 
 **Read-only, deterministic, and derived before any placement** (FR-8(a)). **`data-table`, `{spacing.row-dense}` rows, 24px header, `{spacing.2}` cell padding, numeric cells right-aligned in `{typography.mono-column}`.**
 
@@ -443,7 +483,9 @@ All are `decision-banner` instances at the SURF-04.6 anatomy, mounted above the 
 | **Effective Priority** | The value, plus its **granted/aged decomposition** — `Granted Priority + min(Consecutive Nights Missed × AGING_RATE, AGING_CAP)` with `AGING_RATE = 6`, `AGING_CAP = 30`, and Granted Priority `EXPLORATION` = 10 / `THESIS` = 50 / `URGENT` = 90. |
 | **`admitted_nights`** | Against `max_night_span` (5). |
 | **Starvation Promotion** | Annotation where it applied: `Consecutive Nights Missed ≥ 3` (`STARVATION_NIGHTS = 3`), at most `STARVATION_PROMOTION_LIMIT = 4` per window, tie-broken on submission time. Rendered as an explicit annotation, never silently reordered. |
-| **Decision** | One line per placement, each carrying its citation — the **summary** form, because the Admission Order **summarises** placements while the board **displays** them as banners. FR-25(b) governs what is *displayed*; rendering 22 full cited records inline is impossible at 28px, and pretending otherwise is how a citation list quietly disappears. |
+| **Decision** | **Every ranked row has one — not only the placed ones.** A `Decision` cell that appears on ranks 1–33 and is blank from rank 34 to `QUEUE_DEPTH_CAP = 500` cannot explain why job #400 was skipped, and an unexplained deferral is indistinguishable from a bug. Two forms, distinguished by whether the row was placed: a **placed** row shows `ADMIT` plus the slot it was placed on (`ADMIT · ws-gpu-07 slot 1`); an **unplaced** row shows `DEFER` plus its reason — `CAPACITY_EXHAUSTED` when the fleet simply ran out of Eligible slots, or that row's own exclusion code (`VRAM_CLASS_INSUFFICIENT`, `M3_CORDONED`, `M4_RESERVED`, `PRIOR_NODE_INELIGIBLE`) when the job was excluded on its own merits — and its citation. Each cell carries a citation, in the **summary** form, because the Admission Order **summarises** decisions while the board **displays** them as banners. FR-25(b) governs what is *displayed*; rendering 500 full cited records inline is impossible at 28px, and pretending otherwise is how a citation list quietly disappears. |
+
+**The header states the split, and it is part of the table rather than a footnote:** `‹p› placed · ‹d› deferred of ‹N›` — for example `22 placed · 478 deferred of 500`. Without the tally a reader can see *that* rank 400 is deferred but not *how many* jobs ahead of it were deferred for the same reason, which is the number that tells her whether she is waiting for a slot or is simply outranked. `‹N›` is the full ranked count, so the header and the row count can never disagree.
 
 **The ARITHMETIC IS SHOWN, NOT SUMMED.** A `THESIS` job at 0 missed nights has Effective Priority 50 and cannot be outranked by an aged `EXPLORATION` job at any aging level. When a row's rank is counterintuitive, the decomposition is what makes it checkable.
 
@@ -455,9 +497,9 @@ All are `decision-banner` instances at the SURF-04.6 anatomy, mounted above the 
 - **Focus follows the `job_id`, not the row position.** The order is the daemon's rank output, so a recompute genuinely re-ranks; a reader left on DOM position 3 after a re-rank is now looking at a different job than the one that was announced. Focus re-resolves to the same `job_id` at its new rank and **announces the new rank**.
 - **The list never animates a re-rank under the cursor**, and **drag-to-reorder is banned** — the order is a computed artefact, and letting a user rearrange it would misrepresent that artefact as a preference. Row separation is a 1px `{colors.border-structure}` bottom rule; zebra striping is not used, because a row rule you cannot see is a row you cannot count.
 - The focused row carries a 2px `{colors.focus-ring}` outline at 2px offset. **Focus never moves on a background poll** — a recompute is announced and the focus stays put.
-- Virtualised, never paginated, never infinite-scrolled. `aria-rowcount` is the full count and `aria-rowindex` the per-row index.
+- Virtualised, never paginated, never infinite-scrolled. `aria-rowcount` is **the full ranked count `N`**, not the placed count and not the rendered window, and `aria-rowindex` the per-row index. **Every one of the `N` rows is reachable by keyboard** — because the list is virtualised, a row that scrolls out of the rendered window is still in the rowcount and still reachable with `↓`, `End` or `PgDn`, and a deferred row that exists only in the model's output is a row the keyboard must be able to land on. A virtualised list that silently drops the rows nobody placed would reproduce exactly the blind spot E-1 found, in the accessibility channel.
 
-**Loading:** skeleton rows at final geometry, one per Eligible GPU slot (max 33). **Empty:** `No Pending Set entries. Nothing to order.` **Error:** a latched drift fault renders a **blocking** banner naming it — the order does not exist yet (SURF-02.6). **Success:** the order renders with its computed-at `sim_timestamp` and the promoting rows annotated.
+**Loading:** skeleton rows at final geometry for the rendered window, with the header tally reserved rather than filled — `‹p› placed · ‹d› deferred of ‹N›` — so the frame does not reflow when the counts land. **Empty:** `No Pending Set entries. Nothing to order.` **Error:** a latched drift fault renders a **blocking** banner naming it — the order does not exist yet (SURF-02.6). **Success:** the order renders with its computed-at `sim_timestamp`, the promoting rows annotated, and the header tally filled.
 
 ---
 
@@ -476,13 +518,15 @@ A student who believes her own three jobs are 312 deep has been lied to. The cou
 
 **Position is the payload of this view.** UJ-1's climax is a position in the Pending Set, so it is a real column, not an ordinal buried in a sort. Virtualised with `aria-setsize` / `aria-posinset` on a `role="list"`, so a screen-reader user arrowing the list hears it. `Home`/`End` reach the bottom without arrowing 500 times. `Enter` opens Job detail; `→` expands in place.
 
+**`/` search is viewer-scoped.** For `STUDENT` it queries **her own jobs only**; for `LAB_ADMIN` it is fleet-wide. This is the widest of the three `STUDENT` lockouts and the one with no role error to trip over — an unscoped search returns other students' `job_id`s on a plain `200`, which is why the scoping is specified as a query constraint rather than as an error path. See `EXPERIENCE.md` Information Architecture.
+
 **Loading:** skeleton rows; the depth counter populates first. **Empty:** `Pending Set is empty.` **Error:** at or above `QUEUE_DEPTH_CAP` this is a **capacity banner on the board, not an error** — the fleet is not in trouble, the queue is simply full. The same underlying fact is a *refusal* to a submitter (SURF-01.4) and a *capacity notice* to an operator. **Success:** the admitted job appears at its computed position with its projected first-start.
 
 ---
 
 ## SURF-05 — Event log
 
-**Route:** `g l`, or the Board's log panel. **Persona:** `LAB_ADMIN` only.**
+**Route:** `g l`, or the Board's log panel. **Persona:** `LAB_ADMIN` only. `g l` is **not registered for `STUDENT`**, and a direct navigation renders **404, not 403** — the same rule as SURF-03.**
 
 **Append-only, covering the whole run, surviving daemon restart** (FR-26(a), FR-26(d)). FR-26's testable condition is that replaying one simulated night's log yields the **identical state vector** as the live run — this surface is the instrument that makes the module's history checkable.
 

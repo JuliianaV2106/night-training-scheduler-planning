@@ -291,7 +291,7 @@ Two orthogonal attributes compose on every slot tile, because the PRD keeps them
 
 Four hues are deliberately shared across the two axes, and all four are intentional, because the PRD keeps the axes separate while the operator still has to learn one vocabulary rather than two. `{colors.node-running}` = `{colors.state-running}`: a running slot is running a job. `{colors.node-draining}` = `{colors.state-checkpointing}`: a draining slot is running a `CHECKPOINTING` job. `{colors.node-reserved}` = `{colors.accent-hover}`: a held-back slot is held back on purpose, like a control awaiting a click. `{colors.node-cordoned}` is a brown held deliberately apart from `{colors.state-rejected}` red, so a cordoned *machine* is never mistakable for a refused *job* - the two appear on screen together, and this file insists elsewhere that a reader must be able to tell "refused" from "unrecoverable". The container differs (a 44px tile versus a 20px badge) and the label differs in every case, so nothing is ambiguous.
 
-`draining` exists because Annex Scenario 3 and the mandatory edge case happen precisely inside it. Between 05:45:00 and 05:53:00 a slot is still held — by a job in `CHECKPOINTING` — and Invariant S-1 permits exactly that until 06:00:00. A board that showed such a slot as `available` would be lying during the most safety-critical eight minutes of the night. It shows `draining` in `{colors.node-draining}` with the `▼` glyph the `CHECKPOINTING` badge uses, and the tile carries the remaining seconds to the 05:53:00 SIGKILL instant.
+`draining` exists because Annex Scenario 3 and the mandatory edge case happen precisely inside it. Between 05:45:00 and 05:53:00 a slot is still held — by a job in `CHECKPOINTING` — and Invariant S-1 permits exactly that until 06:00:00. A board that showed such a slot as `available` would be lying during the most safety-critical eight minutes of the night. It shows `draining` in `{colors.node-draining}` with the `▼` glyph the `CHECKPOINTING` badge uses, and the tile carries the remaining seconds to the 05:53:00 SIGKILL instant. **The 05:53:00–06:00:00 remainder is the seventh minute of that same lie in the other direction**: the hold is still legal under S-1 but the SIGKILL has already been missed, so a tile that kept reading `draining · SIGKILL in mm:ss` past 05:53:00 would be counting toward an instant that is behind it. That is the OVERDUE branch above.
 
 `reserved` cites Module 4 and `cordoned` folds a Module 3 health fault into itself per FR-12(a), always carrying the cause string as its label — `cordoned · EVICTION_CHECKPOINT_WRITE_FAILED` is the real shape of a cordon from FR-23, and the cause is what lets Ines distinguish a genuinely faulty node from a kubelet DiskPressure false positive (FR-23(i), known limitation 2).
 
@@ -382,7 +382,32 @@ A 44px `{rounded.md}` tile, 1px `{colors.border-structure}`, carrying the slot's
 
 `server-gpu-01` renders as a paired tile with a shared node header above both slots, because the two slots are independent but the node is one machine and Ines reasons about the machine. The per-slot independence is preserved inside the pair: slot 0 `running` and slot 1 `reserved` is a legal and common display, and the two tiles are visually independent even though they share a header.
 
-A slot in `draining` carries a mono countdown, but only inside the Eviction Ramp, where the deadline is real: from 05:45:00 to the 05:53:00 SIGKILL instant, the tile reads `draining - SIGKILL in mm:ss`. Outside the Ramp the deadline is the 300 s Checkpoint Budget of FR-16(c)/(d), not a wall-clock instant, so the tile reads `draining - checkpointing` with elapsed seconds and no SIGKILL reference. A `draining` tile that always showed a 05:53:00 countdown would be quoting a deadline that does not exist at 23:10. A slot in `cordoned` carries the cause string in place of the state label.
+**The one exception to that independence: a single 2-GPU job renders as ONE spanning tile.** FR-2(k) admits `gpus_per_node = 2` only on `server-gpu-01`, so a 2-GPU job occupies **both** slots of the only Node that has two. Drawing it as two independent `running` tiles would assert a fact that is false — that either slot could be released, which is precisely what a multi-slot job means not to allow. So the spanning tile **occupies both cells of the pair**, carries the `job_id` and the label `2 × 48 GB`, and is a single accessibility entity.
+
+| Property | Spec |
+|---|---|
+| **Geometry** | One tile spanning both slot cells, same 44px height floor, `{spacing.1}` (4px) internal gutter collapsed. The node header above is unchanged. |
+| **Occupancy** | Reads `running` (or `draining`, or `available` when released) in `{colors.node-running}` / `{colors.node-draining}` — one slot state for the pair, because one job holds it. |
+| **Label** | `job_id` at `{typography.mono-data}` truncated to 8 characters, **plus `2 × 48 GB`** as a second line. The `2 × 48 GB` is not decoration: it is the fact that distinguishes this tile from two ordinary 48 GB slots. |
+| **Accessible name** | `server-gpu-01 slots 0–1, ‹occupancy label›, ‹eligibility label if any›, ‹job_id or reason›` — **`spans slots 0–1` replaces the per-slot `slot ‹n›` field.** A name reading `slot 0` for a tile that covers two slots is a name that understates the hold by half. |
+| **Node detail** | `Enter` opens Node detail for `server-gpu-01`; the job is listed once, in **Assigned jobs**, not twice. |
+| **Roll-up** | Counted as **2 slots, 1 job.** The roll-up's own axis is slots, so the spanning tile contributes 2 to `held` — and a job count is reported alongside it so a single job is never mistaken for two placements. See the roll-up rule below. |
+
+**Eligibility marks still apply to the pair.** A Module 4 reservation on `server-gpu-01` is a Node-level fact (FR-12(b)), so a spanning tile may read `running · reserved` with both marks, exactly as a non-spanning slot would. The span does not merge the two axes; it merges two *occupancy* cells that one job holds.
+
+A `draining` slot carries a mono countdown, and **which countdown it carries is decided by the Simulated Clock instant, in three branches.** The rule is stated as a single chain so it cannot be read two ways:
+
+| Branch | Instant | Tile reads | Token | Glyph + text |
+|---|---|---|---|---|
+| **1 · Inside the Eviction Ramp** | 05:45:00 → 05:53:00 | `draining · SIGKILL in mm:ss` | `{colors.node-draining}` | `▼` + `draining` |
+| **2 · Outside the Ramp, deadline is a budget** | any preemption drain (e.g. 23:10), before 05:45:00 | `draining · checkpointing · elapsed ‹n›s / 300s` | `{colors.node-draining}` | `▼` + `draining` |
+| **3 · OVERDUE** | **after 05:53:00, while the slot is still held** | `SIGKILL overdue +mm:ss` | `{colors.state-rejected}` | `!` + `SIGKILL overdue` |
+
+**Branch 1 counts to the 05:53:00 SIGKILL instant**, which is the only wall-clock deadline the Ramp creates. **Branch 2 counts the 300 s Checkpoint Budget** of FR-16(c)/(d), because a preemption drain at 23:10 has a budget and no wall-clock stop: a `draining` tile quoting 05:53:00 at 23:10 is quoting a deadline that does not exist. **Branch 3 is the case a Ramp-only reading leaves uncovered** — a slot still held after 05:53:00 because the SIGKILL missed (NP-3.8: the daemon is dead at 05:53 and restored at 05:56). Without it, a held slot at 05:54 falls into branch 2 and quietly reports `elapsed 0s / 300s` on a job whose SIGKILL is already four minutes overdue, which hides exactly the NFR-14 / Invariant S-1 breach the operator exists to catch.
+
+**Branch 3 repaints the tile in `{colors.state-rejected}` — the first and only time a *slot* borrows a job-state hue — and carries the `!` glyph with the words `SIGKILL overdue`.** Colour, glyph and text, all three, because NFR-15 has no exceptions and this is the one tile whose colour now means something it did not before. The tile also raises an **adverse `decision-banner` on the board** citing `self:EVICTION-RAMP-v1`, which is the rule whose instant was missed. **At 06:00:00, with any hold still outstanding, that banner escalates to name the Invariant S-1 / NFR-14 violation and stays until the hold clears** — it never auto-dismisses, in line with the console's no-time-limited-content rule, because a banner that timed out at the moment the breach stopped being true is a banner that hides the breach.
+
+A slot in `cordoned` carries the cause string in place of the state label.
 
 ### `decision-banner` — 10 decision variants, 2 groups
 
@@ -405,7 +430,7 @@ One component, `{rounded.md}`, `{spacing.banner-inset}` padding, a 3px left bord
 
 ### `clock-control`
 
-A segmented control of `⏸` `1×` `60×` `360×` `1440×` at 28px height in `{typography.mono-data}`. The active segment is `{colors.accent}` fill with `{colors.text-on-accent}` text; inactive segments are `{colors.surface-raised}` with `{colors.text-secondary}`. The simulated clock readout sits immediately left of it in `{typography.mono-data-lg}` and is always present — an operator must never be unsure whether they are reading simulated or wall-clock time.
+A segmented control of **`1×` `60×` `360×` `1440×` `⏸`** at 28px height in `{typography.mono-data}`. **The rendered segment order is the keymap order**: `1` sets 1×, `2` sets 60×, `3` sets 360×, `4` sets 1440×, and `Space`/`0` pauses. Pause is the fifth segment and deliberately **not** the fifth digit, because a control whose fifth digit is a rate and whose fifth key is pause is a control a screen-reader user mis-operates, and a live simulation is the worst thing to mis-operate. An earlier draft of this section rendered `⏸` first while the keymap bound the digits positionally, so a user counting segments and pressing `5` got pause instead of 1440× and a user hearing "1×, radio button, 2 of 5" and pressing `1` got 60×. The control was reordered, not the keymap made non-obvious. The active segment is `{colors.accent}` fill with `{colors.text-on-accent}` text; inactive segments are `{colors.surface-raised}` with `{colors.text-secondary}`. The simulated clock readout sits immediately left of it in `{typography.mono-data-lg}` and is always present — an operator must never be unsure whether they are reading simulated or wall-clock time.
 
 ### `data-table`
 
@@ -430,7 +455,7 @@ Persistent, full-width, `{typography.mono-label}`. Carries the daemon connection
 | Show `EVICTION_FAILED` with the retained Checkpoint step and the "re-admitted tonight" note | Let `EVICTION_FAILED` read as terminal; T-20 returns it to the Pending Set |
 | Render `VRAM_CLASS_INSUFFICIENT` as a per-job exclusion reason in a `reason-panel` | Paint a healthy 48 GB slot red because one job cannot use it |
 | Show node state per GPU slot, both slots of `server-gpu-01` independently | Collapse `server-gpu-01` to one badge; it has 2 slots (F-42) |
-| Show a `draining` slot for the whole 05:45:00–05:53:00 Ramp, with a countdown to SIGKILL | Show a slot held by a `CHECKPOINTING` job as `available`; S-1 permits the hold until 06:00:00 |
+| Show a `draining` slot for the whole 05:45:00–05:53:00 Ramp, counting down to SIGKILL, and **escalate it to `SIGKILL overdue` in `{colors.state-rejected}` if the hold survives past 05:53:00** | Show a slot held by a `CHECKPOINTING` job as `available`; S-1 permits the hold until 06:00:00. Equally: keep reporting `elapsed / 300s` on a slot whose SIGKILL is already overdue |
 | Give every idle slot a reason string (FR-25(d)) | Render an idle slot blank, or with a bare en dash |
 | Render `summary` + full `citations` on **all 10** banner variants | Strip citations from a low-weight `ADMIT` or `RESUME`; SM-5 and FR-25(b) are absolute |
 | Render every citation in `{colors.citation-ink}`, with non-`self:` authorities weighted heavier than `self:` | Style all citations identically (the F-1 split rule stops being visible), or use `{colors.accent}` / `{colors.text-muted}` for citations (`text-muted` is 4.37:1 on the chip ground, under the 4.5:1 floor) |
