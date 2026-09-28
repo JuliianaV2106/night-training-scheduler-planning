@@ -172,14 +172,14 @@ The hard part — and the reason this module exists at all — is that an eight-
 | T-6 | `RUNNING` | 05:45:00 | `CHECKPOINTING` | Job is `RUNNING` at Eviction Ramp start | FR-19 |
 | T-7 | `RUNNING` | Preemption authorised | `CHECKPOINTING` | Challenger margin and authority satisfied (FR-16) | FR-16 |
 | T-8 | `CHECKPOINTING` | Checkpoint durable and digest recorded | `EVICTED_RESUMABLE` | **Verified Checkpoint recorded before 05:53:00 (F-7);** digest recorded | FR-18 |
-| T-9 | `CHECKPOINTING` | 05:53:00 | `FAILED` | Ramp expired without a verified Checkpoint | FR-19 |
+| T-9 | `CHECKPOINTING` | 05:53:00 | `FAILED` (`CHECKPOINT_DEADLINE_MISSED`) | Ramp expired without a verified Checkpoint | FR-19 |
 | T-10 | `CHECKPOINTING` | Checkpoint write errors | `EVICTION_FAILED` (`CHECKPOINT_WRITE_FAILED`) | Node released; Cordon Request issued | FR-23 |
 | T-12 | `EVICTED_RESUMABLE` | 21:30:00 pre-verification, digest re-verified | `QUEUED_PENDING_WINDOW` | Re-admitted to Pending Set with prior Checkpoint attached (F-16) | FR-21 |
 | T-13 | `EVICTED_RESUMABLE` | 21:30:00 pre-verification, digest mismatch | `FAILED` (`CHECKPOINT_CORRUPT`) | Checkpoint Quarantined; human notified (F-16) | FR-20 |
 | T-14 | `EVICTED_RESUMABLE` | Victim of Preemption (not the morning ramp), Checkpoint verified | `QUEUED_PENDING_WINDOW` | Eviction cause was Preemption; Checkpoint attached; **Consecutive Nights Missed NOT incremented** (FR-14(d)); original submission time preserved; may be re-placed the same night if a slot frees (F-8) | FR-16 |
 | T-15 | `QUEUED_PENDING_WINDOW` | Retention Deadline passed | `EXPIRED` | Checkpoints retained for the 7-day expiry grace, then garbage-collection eligible | FR-22, FR-7 |
 | T-16 | `RUNNING` | Node fault reported by Module 3 | `EVICTED_RESUMABLE` | A verified Checkpoint exists; node released | FR-12 |
-| T-17 | `RUNNING` | Node fault, no verified Checkpoint | `FAILED` | Work since last Checkpoint is unrecoverable | FR-12 |
+| T-17 | `RUNNING` | Node fault, no verified Checkpoint | `FAILED` (`NODE_FAULT_NO_CHECKPOINT`) | Work since last Checkpoint is unrecoverable | FR-12 |
 | T-18 | any non-terminal | Daemon crash and restart | unchanged | **State restored from the durable decision log with no replay; FR-9 reconciliation runs afterwards as a separate, recorded step (F-12). The no-replay property is enforced by FR-9, not by this guard (F-13)** | FR-9 |
 | T-19 | `QUEUED_PENDING_WINDOW` or `EVICTED_RESUMABLE` | Admitted Nights would exceed Max Night Span | `FAILED` (`MAX_NIGHT_SPAN_EXCEEDED`) | Admitted Nights already 5; retained Checkpoint preserved | FR-4, FR-21 |
 | T-20 | `EVICTION_FAILED` | Next Night Window opens, retained Checkpoint digest re-verifies | `QUEUED_PENDING_WINDOW` | **A verified Checkpoint is retained AND Admitted Nights < Max Night Span — otherwise T-19 applies (F-11).** Placement is **not** restricted to the cordoned Node: the job may be placed on any Eligible Node | FR-23, FR-20 |
@@ -246,7 +246,20 @@ Citations are drawn only from delegated sources, formatted `authority:identifier
 
 `policy:M2/rule-id@policy-version` · `quota:M8/verdict-id@version` · `entitlement:M1/subject-id@version` · `node-state:M3/node-id@telemetry-timestamp` · `reservation:M4/window-id@version` · `catalog:M5/model-id@version` · `self:invariant-id` (for decisions this module makes about its own state — the Eviction Ramp deadline, its own scope boundary, its own queue cap, its own Max Night Span ceiling, or its own Job Spec rules)
 
-**The split rule (F-1):** a `DENY` may be justified solely by `self:` **only when the reason is a module-owned rule** — the scope boundary (FR-3), Max Night Span (FR-4), the queue cap (FR-7), or Job Spec validation (FR-2). A `DENY` whose reason is a **delegated verdict** (Modules 1, 2, 5, or 8) may not; it needs at least one non-`self:` citation naming the verdict. **Every `PREEMPT`, `EVICT`, and `EXPIRE` requires at least one non-`self:` citation, unconditionally.** `self:` is otherwise legitimate only for time and self-integrity rules. A denial, preemption, or eviction of a user's work may never be justified solely by a time or bookkeeping reason.
+**Registered `self:` invariant ids (OQ-13).** The document uses or requires exactly these `self:` identifiers — no others. Each id is the module-owned invariant a Decision Record cites when it decides about this module's own state:
+
+- `self:JOBSPEC-VALIDATION-v1` — FR-2, the Job Spec field rules (T-1, T-2).
+- `self:SCOPE-BOUNDARY-v1` — FR-3, the Module 9/10 scope boundary (reason `OUT_OF_SCOPE_DISTRIBUTED`).
+- `self:MAX-NIGHT-SPAN-v1` — FR-4, the 5-night / 38.75-hour ceiling (FR-2(j), T-19).
+- `self:QUEUE-DEPTH-CAP-v1` — FR-7(a), the 500-job Pending Set cap.
+- `self:RETENTION-DEADLINE-v1` — FR-7(b), the Retention Deadline assigned at admission (T-15, reason `RETENTION_DEADLINE`).
+- `self:PREEMPTION-MARGIN-v1` — FR-16, the Preemption Margin of 20 and the THESIS/URGENT authority gate (T-7, reason `PREEMPTION_REFUSED`).
+- `self:EVICTION-RAMP-v1` — FR-19, the 05:45 SIGTERM / 05:53 SIGKILL deadlines (T-5, T-6, T-9, T-10, T-20).
+- `self:CHECKPOINT-QUARANTINE-v1` — FR-20, the verification discipline and the Checkpoint Quarantine (T-12, T-13).
+- `self:RECONCILIATION-v1` — FR-9, missed-window reconciliation after a daemon restart (T-18).
+- `self:CHECKPOINT-STORE-BUDGET-v1` — NFR-13, the Checkpoint store ceiling.
+
+**The split rule (F-1):** a `DENY` may be justified solely by `self:` **only when the reason is a module-owned rule** — the scope boundary (FR-3), Max Night Span (FR-4), the queue cap (FR-7), or Job Spec validation (FR-2); likewise an `EXPIRE` on a Retention Deadline (FR-7(b), T-15) may cite `self:RETENTION-DEADLINE-v1` alone, because retention is a module-owned bookkeeping rule with no delegated authority to name. A `DENY` whose reason is a **delegated verdict** (Modules 1, 2, 5, or 8) may not; it needs at least one non-`self:` citation naming the verdict. **Every `PREEMPT` and `EVICT` requires at least one non-`self:` citation, unconditionally.** `self:` is otherwise legitimate only for time and self-integrity rules. A denial, preemption, or eviction of a user's work may never be justified solely by a time or bookkeeping reason.
 
 ### 6.3 Worked example
 
@@ -254,6 +267,59 @@ Citations are drawn only from delegated sources, formatted `authority:identifier
 > **Summary:** "Night Training Scheduler stopped job JOB-0417 on ws-gpu-12 at the 06:00 morning deadline so the machine is free for 08:00 lab use; last durable Checkpoint is at step 41,200, digest `sha256:3f9a…c201`."
 > **Citations:** `self:EVICTION-RAMP-v1`, `node-state:M3/ws-gpu-12@2026-10-04T05:44:58Z`
 > **Inputs:** `elapsed_runtime_s: 28140`, `checkpoint_budget_s: 300`, `estimated_total_s: 111600`, `progress_fraction: 0.252`
+
+### 6.4 Transition → Decision Record map
+
+*The exhaustive lookup for FR-24(f) injectivity (OQ-12): every §4.2 transition (T-1 … T-20, T-21, T-22, T-23 — T-11 was deleted in the adversarial review) and every non-transition record below carries **exactly one** Decision Record naming its own `decision`, mandatory `reason`, and required `citations`. No transition may be left without a value. Reason codes are the mandatory `reason` value on the record; they are symmetrical with the parenthesised reason in the §4.2 "To" column.*
+
+*Single-source-of-truth rule: the map below is not a parallel spec. The `decision`, `reason`, and citation requirements stated here are the concrete values FR-24's emitter enforces; where FR-text and the map both speak, the map's assignment is the binding one, and a gap found while mapping is closed in the FR it belongs to before a record is emitted.*
+
+| Transition | `decision` | `reason` (mandatory) | Required citation(s) |
+|---|---|---|---|
+| T-1 | `ADMIT` | — | `self:JOBSPEC-VALIDATION-v1`; every delegated submission verdict consulted (`entitlement:M1/…`, `policy:M2/…`, `catalog:M5/…`, `quota:M8/…`) |
+| T-2 | `DENY` | `VALIDATION_FAILED` | The failing rule's authority (F-1 split rule): `self:JOBSPEC-VALIDATION-v1` alone only for a module-owned failure; the delegated verdict otherwise |
+| T-3 | `ADMIT` | — | The granted-priority source that ranked the job (`policy:M2/…` or the administrator's grant record); `node-state:M3/…`; `reservation:M4/…` when consulted |
+| T-4a | `DEFER` | `NO_ELIGIBLE_NODE` | `node-state:M3/…`, `reservation:M4/…` — the per-Node exclusion reasons (FR-12) |
+| T-4b | `DEFER` | `CAPACITY_EXHAUSTED` | `node-state:M3/…` (the Eligible slot count); `policy:M2/…` (the ranks that placed this job outside the free slots) |
+| T-5 | `COMPLETE` | — | `self:EVICTION-RAMP-v1` (completion verified at or before 05:45:00) |
+| T-6 | `EVICT` | — | `self:EVICTION-RAMP-v1`; `node-state:M3/…` (last health reading) — at least one non-`self:` per FR-24(a) |
+| T-7 | `PREEMPT` | — | `self:PREEMPTION-MARGIN-v1`; the challenger's granted-priority source (`policy:M2/…` or administrator grant record) — at least one non-`self:` per FR-24(a) |
+| T-8 | `EVICT` / `PREEMPT` | — | Completion record of the initiating T-6/T-7 decision: keeps its `decision` (`EVICT` from the Ramp, `PREEMPT` from a Preemption) and sets `supersedes` = the T-6/T-7 record id; citations mirror the initiating record (`self:EVICTION-RAMP-v1` or `self:PREEMPTION-MARGIN-v1` + `node-state:M3/…`) |
+| T-9 | `FAIL` | `CHECKPOINT_DEADLINE_MISSED` | `self:EVICTION-RAMP-v1` (the 05:53:00 deadline) |
+| T-10 | `FAIL` | `CHECKPOINT_WRITE_FAILED` | `node-state:M3/…` (the write-failure evidence); `self:EVICTION-RAMP-v1` |
+| T-12 | `RESUME` | — | `self:CHECKPOINT-QUARANTINE-v1` (digest re-verified at pre-verification); `node-state:M3/…` (the chosen Node) |
+| T-13 | `FAIL` | `CHECKPOINT_CORRUPT` | `self:CHECKPOINT-QUARANTINE-v1` (Quarantine) |
+| T-14 | `ADMIT` | — | `node-state:M3/…` (the freed slot that permits same-night re-placement); `self:PREEMPTION-MARGIN-v1` |
+| T-15 | `EXPIRE` | `RETENTION_DEADLINE` | `self:RETENTION-DEADLINE-v1` (module-owned rule; permitted alone per §6.2 split rule) |
+| T-16 | `EVICT` | `NODE_FAULT` | `node-state:M3/…` (the fault) — at least one non-`self:` per FR-24(a) |
+| T-17 | `FAIL` | `NODE_FAULT_NO_CHECKPOINT` | `node-state:M3/…` (the fault) |
+| T-18 | `DEFER` | `DAEMON_RESTORE` | `self:RECONCILIATION-v1` — the restore makes **no** new decision and defers everything to the reconciliation step (FR-9) |
+| T-19 | `FAIL` | `MAX_NIGHT_SPAN_EXCEEDED` | `self:MAX-NIGHT-SPAN-v1` |
+| T-20 | `ADMIT` | — | `self:EVICTION-RAMP-v1` (the ramp failure being recovered); `node-state:M3/…` (any Eligible Node, not the cordoned one) |
+| T-21 | `FAIL` | `MODEL_DEPRECATED` | `catalog:M5/<model-id>@<version>` |
+| T-22 | `EVICT` | `PROCESS_EXIT` | `node-state:M3/…` (the process-exit telemetry) — at least one non-`self:` per FR-24(a) |
+| T-23 | `FAIL` | `PROCESS_EXIT_NO_CHECKPOINT` (`OOM_KILLED` / `PROCESS_EXITED`) | `node-state:M3/…` (the process-exit telemetry) |
+
+**Non-transition records** (`transition: null`, `job_id` or `node_id` as flagged):
+
+| Source | `decision` | `reason` (mandatory) | Required citation(s) |
+|---|---|---|---|
+| FR-9(c) — reconciliation performs a missed activation | `ADMIT` | `RECONCILIATION_ACTIVATION` | `self:RECONCILIATION-v1`; the FR-8 sequencing inputs |
+| FR-9(d) — the missed window has closed | `DEFER` | `MISSED_WINDOW` | `self:RECONCILIATION-v1` |
+| FR-8(e) — a blocked activation re-attempt | `DEFER` | the block reason (missing verdict / freeze lifted) | the missing authority, named (e.g. `policy:M2/…`, `catalog:M5/…`) |
+| FR-7 — the Pending Set is at the cap | `DENY` | `QUEUE_FULL` | `self:QUEUE-DEPTH-CAP-v1` (module-owned, so `self:` alone is legitimate) |
+| NFR-13 — submission refused on store pressure | `DENY` | `STORE_FULL` | `self:CHECKPOINT-STORE-BUDGET-v1` |
+| NFR-13 — escalation to a human | `DEFER` | `DISK_PRESSURE_ESCALATION` | `self:CHECKPOINT-STORE-BUDGET-v1` |
+| FR-16(c) — a refused Preemption | `DEFER` | `PREEMPTION_REFUSED` | `self:PREEMPTION-MARGIN-v1` (OQ-1) |
+| FR-20(f) — a resume not verified by 21:59:00 | `DEFER` | `UNVERIFIED_RESUME` | `self:CHECKPOINT-QUARANTINE-v1` — an unverified resume is never admitted |
+| FR-23(c) — a Cordon Request | `CORDON` | `CHECKPOINT_WRITE_FAILED` | `node-state:M3/…`; `self:EVICTION-RAMP-v1` |
+
+**Notes.**
+
+- **T-8 (OQ-12):** CHECKPOINTING → EVICTED_RESUMABLE is the *completion* of the decision taken at T-6 (Ramp) or T-7 (Preemption), not a second decision. Its record is a revision appended under FR-24(d): same `decision`, `supersedes` = the initiating record, identical required citations. FR-24(f) counts one record per transition; FR-19's "one `EVICT` Decision Record per job" counts one decision chain (initial decision + completion).
+- **T-15 vs FR-24(a) — resolved (team decision, 2026-09-28):** `EXPIRE` on a Retention Deadline is a module-owned rule with no delegated authority to name, so it joins the module-owned class of the §6.2 split rule and cites `self:RETENTION-DEADLINE-v1`. FR-24(a) and NFR-4 now require the non-`self:` citation for every `PREEMPT` and `EVICT`, and for a `DENY` based on a delegated verdict.
+- **T-18:** the restore record carries `decision` `DEFER` because restoration makes no new decision; every new decision after a restart belongs to the FR-9 reconciliation step and its own records.
+- The §6.3 worked example is the T-6 (`EVICT`) record rendered in full.
 
 ---
 
@@ -331,7 +397,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **Trigger:** Every submission; every Window Activation (deprecation re-check, FR-6); and every resume of a `QUEUED_PENDING_WINDOW` job whose Job Spec has changed.
 **Inputs:** The Job Spec.
 **Validation rules:** (a) container image must be pinned by digest, not tag; (b) `gpus_per_node` must be 1 or 2; (c) requested VRAM must not exceed the largest single-Node VRAM class (48 GB) — this rejects 70B-class jobs on a 24 GB workstation with a citation naming the requested and available classes; (d) resource `requests` must equal resource `limits` for GPU and memory, since quota accounting reads `requests`; (e) `node_selector`, if present, must name a Node matching a declared VRAM class; (f) `restart_policy` must not request a restart that would silently re-enter a Night Window without re-admission; (g) `checkpoint_interval_minutes` must be a positive integer **≤ 30** (F-17) — a longer interval would let progress since the last Checkpoint exceed what the Checkpoint Budget can plausibly flush at the Ramp; (h) the model record from Module 5 must exist and must not be deprecated; (i) the Job Spec must declare an estimated duration, or have one derived from the model record; **(j) the estimated duration must not exceed Max Night Span — 5 consecutive Night Windows, 38.75 hours of usable training (5 × 7 h 45 min). An estimate above 38.75 h is a rejection, not a multi-night admission.**
-**Outputs:** A validation result carrying, per field, `pass` or a `rule_id` plus a human-readable message.
+**Outputs:** A validation result carrying, per field, `pass` or a `rule_id` plus a human-readable message; every rejection's `DENY` Decision Record cites the failing rule under `self:JOBSPEC-VALIDATION-v1`.
 **Testable condition:** A Job Spec pinned to `:latest`, on a single-worker Job Spec (`worker_count = 1`, so the FR-3 scope short-circuit never fires), requesting 64 GB VRAM and a `checkpoint_interval_minutes` of 240 produces exactly three rejections — digest (a), VRAM class (c), and Checkpoint interval (g) — each naming the field and the rule identifier, each reported individually rather than as a generic "invalid spec."
 
 #### FR-3: Refuse multi-node and distributed Training Jobs
@@ -471,9 +537,9 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **System responsibility:** Make stopping someone's running work a deliberate, gated, and fully explained act — and make thrashing impossible.
 **Trigger:** A pending job outranks a `RUNNING` job and no Eligible Node is free.
 **Inputs:** Challenger and victim Effective Priority; Challenger Granted Priority; Preemption Margin; victim's Checkpoint state.
-**Validation rules:** (a) `Preemption Margin = 20` `[ASSUMPTION: A-8]`; (b) the challenger's Effective Priority must be at least the victim's plus 20, **and** the challenger's Granted Priority must be `THESIS` or `URGENT` — aging alone can never authorise Preemption; (c) the victim must have a verified Checkpoint, or be able to produce one within the Checkpoint Budget, or the Preemption is refused and the refusal is explained; (d) Preemption drives the victim through the same `CHECKPOINTING` path as the Eviction Ramp — the challenger does not start until the victim's Checkpoint verifies and the Node is released; (e) the victim transitions `EVICTED_RESUMABLE` → `QUEUED_PENDING_WINDOW` **immediately** once its Checkpoint verifies (T-14), with its Checkpoint attached and its **original submission time preserved** — its Consecutive Nights Missed is **not** incremented, because it received an admitted minute this window (FR-14(d)); it may be re-placed the same night if an Eligible Node frees (F-5, F-8); (f) the same victim may not be preempted twice within one Night Window.
+**Validation rules:** (a) `Preemption Margin = 20` `[ASSUMPTION: A-8]`; (b) the challenger's Effective Priority must be at least the victim's plus 20, **and** the challenger's Granted Priority must be `THESIS` or `URGENT` — aging alone can never authorise Preemption; (c) the victim must have a verified Checkpoint, or be able to produce one within the Checkpoint Budget, or the Preemption is **refused and recorded as a `DEFER` Decision Record with reason `PREEMPTION_REFUSED` and a citation to `self:PREEMPTION-MARGIN-v1` (OQ-1)**; (d) Preemption drives the victim through the same `CHECKPOINTING` path as the Eviction Ramp — the challenger does not start until the victim's Checkpoint verifies and the Node is released; (e) the victim transitions `EVICTED_RESUMABLE` → `QUEUED_PENDING_WINDOW` **immediately** once its Checkpoint verifies (T-14), with its Checkpoint attached and its **original submission time preserved** — its Consecutive Nights Missed is **not** incremented, because it received an admitted minute this window (FR-14(d)); it may be re-placed the same night if an Eligible Node frees (F-5, F-8); (f) the same victim may not be preempted twice within one Night Window.
 **Outputs:** Preemption Decision Record, `CHECKPOINTING` → `EVICTED_RESUMABLE` for the victim, `ADMIT` for the challenger; the victim's preserved state.
-**Testable condition:** **Annex Scenario 4** — a `THESIS` challenger at Effective Priority 50 preempts an `EXPLORATION` victim at aged Effective Priority 22 (50 ≥ 22 + 20), with no Urgent Grant anywhere in the path, and the victim is checkpointed before the challenger starts. Conversely, an aged `EXPLORATION` challenger at Effective Priority 40 **cannot** preempt a `THESIS` victim at 50 (margin 10 < 20) and is refused with a citation naming the Preemption Margin rule — proving aging alone confers no authority. An `URGENT` challenger at 90 preempts a `THESIS` victim at 50. In every preemption case the victim is not preempted again in the same window.
+**Testable condition:** **Annex Scenario 4** — a `THESIS` challenger at Effective Priority 50 preempts an `EXPLORATION` victim at aged Effective Priority 22 (50 ≥ 22 + 20), with no Urgent Grant anywhere in the path, and the victim is checkpointed before the challenger starts. Conversely, an aged `EXPLORATION` challenger at Effective Priority 40 **cannot** preempt a `THESIS` victim at 50 (margin 10 < 20) and is refused with a `DEFER` Decision Record, reason `PREEMPTION_REFUSED`, citing `self:PREEMPTION-MARGIN-v1` — proving aging alone confers no authority. An `URGENT` challenger at 90 preempts a `THESIS` victim at 50. In every preemption case the victim is not preempted again in the same window.
 
 #### FR-17: Administer Priority grants
 
@@ -502,7 +568,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **System responsibility:** Guarantee that at 06:00:00 no Training Job holds a GPU, and that the 2 h 07 min between the end of the Eviction Ramp (05:53:00) and the 08:00 lab session stay clean.
 **Trigger:** 05:45:00 campus local time.
 **Inputs:** Set of `RUNNING` jobs; the Daemon Clock; each job's Checkpoint state.
-**Validation rules:** (a) SIGTERM is dispatched to every `RUNNING` job at 05:45:00 ± 2 s; (b) the Checkpoint Budget is the 300 s *expected* window from 05:45:00 to 05:50:00, but the 05:50:00–05:53:00 reserve is **still usable** (F-7): a Checkpoint verified any time before 05:53:00 satisfies T-8 `[ASSUMPTION: A-9]`; (c) SIGKILL is dispatched to every surviving job at 05:53:00 ± 2 s regardless of its state; (d) each Node's allocation is released independently and immediately on that job's exit, not at 05:53:00; (e) a job that reaches `COMPLETED` before 05:45:00 is not signalled; (f) a job that has not produced a verified Checkpoint by 05:53:00 transitions to `FAILED` with its last verified Checkpoint retained.
+**Validation rules:** (a) SIGTERM is dispatched to every `RUNNING` job at 05:45:00 ± 2 s; (b) the Checkpoint Budget is the 300 s *expected* window from 05:45:00 to 05:50:00, but the 05:50:00–05:53:00 reserve is **still usable** (F-7): a Checkpoint verified any time before 05:53:00 satisfies T-8 `[ASSUMPTION: A-9]`; (c) SIGKILL is dispatched to every surviving job at 05:53:00 ± 2 s regardless of its state; (d) each Node's allocation is released independently and immediately on that job's exit, not at 05:53:00; (e) a job that reaches `COMPLETED` before 05:45:00 is not signalled; (f) a job that has not produced a verified Checkpoint by 05:53:00 transitions to `FAILED` (reason `CHECKPOINT_DEADLINE_MISSED`) with its last verified Checkpoint retained.
 **Outputs:** Every job in a terminal or resumable state; every Node released; one `EVICT` Decision Record per job citing the Eviction Ramp rule and the Node's last health reading.
 **Testable condition:** Advancing the Simulated Clock to 06:00:00 with 14 jobs `RUNNING` results in exactly 0 Node allocations held, 14 `EVICT` Decision Records, and 0 jobs in `RUNNING` or `CHECKPOINTING`; a job that completed at 05:44:00 receives no signal.
 
@@ -511,7 +577,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **System responsibility:** Never load a Checkpoint that might be corrupt, and never destroy one that might be recoverable.
 **Trigger:** The 21:30:00 pre-verification phase (F-16); re-admission of an `EVICTED_RESUMABLE` job at 22:00:00.
 **Inputs:** The recorded SHA-256 digest; the Checkpoint bytes.
-**Validation rules:** (a) the digest is recomputed from the bytes and compared **at the 21:30:00 pre-verification phase** before the job is admitted as a resume; (b) a match admits the resume and emits a `RESUME` Decision Record citing the digest; (c) a mismatch places the Checkpoint in Checkpoint Quarantine, transitions the job to `FAILED` with reason `CHECKPOINT_CORRUPT`, emits a `FAIL` Decision Record, and notifies a human; (d) a quarantined Checkpoint is excluded from garbage collection until released by a human; (e) no Cordon Request is issued for a corrupt artifact, because a corrupt file is not evidence of a faulty Node; (f) **a job whose Checkpoint was not fully verified by 21:59:00 is not admitted that night**, recorded as a cited `DEFER` Decision Record — a job is never admitted on an unverified resume (F-16).
+**Validation rules:** (a) the digest is recomputed from the bytes and compared **at the 21:30:00 pre-verification phase** before the job is admitted as a resume; (b) a match admits the resume and emits a `RESUME` Decision Record citing the digest; (c) a mismatch places the Checkpoint in Checkpoint Quarantine, transitions the job to `FAILED` with reason `CHECKPOINT_CORRUPT`, emits a `FAIL` Decision Record citing `self:CHECKPOINT-QUARANTINE-v1`, and notifies a human; (d) a quarantined Checkpoint is excluded from garbage collection until released by a human; (e) no Cordon Request is issued for a corrupt artifact, because a corrupt file is not evidence of a faulty Node; (f) **a job whose Checkpoint was not fully verified by 21:59:00 is not admitted that night**, recorded as a cited `DEFER` Decision Record — a job is never admitted on an unverified resume (F-16).
 **Outputs:** A verified resume, or a quarantined Checkpoint and a `FAILED` job.
 **Testable condition:** A Simulation Fault corrupting one byte of a recorded Checkpoint causes the resume to be refused, the Checkpoint to enter Checkpoint Quarantine, zero bytes to be loaded into any training process, and a human notification naming the digest mismatch; a fault-free Checkpoint resumes and logs `RESUMED_FROM_CHECKPOINT`.
 
@@ -551,7 +617,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **System responsibility:** Make §6 a machine-enforced invariant rather than a documentation aspiration.
 **Trigger:** Every state transition in §4.2, without exception.
 **Inputs:** The transition; the delegated verdicts consulted; the evaluated inputs.
-**Validation rules:** (a) a `DENY` based on a delegated verdict, and every `PREEMPT`, `EVICT`, and `EXPIRE`, require at least one non-`self:` citation; a `DENY` based on a module-owned rule (scope boundary, Max Night Span, queue cap, or Job Spec validation) may cite `self:` alone (F-1); (b) any record with zero citations is rejected by the emitter and **the transition it describes is not applied** — fail closed, and the rejection is logged as an `EMITTER_REJECTED` integrity event; (c) `summary` must satisfy §6.1; (d) records are immutable and append-only; (e) emission is durable before the transition is committed, not after; (f) **every transition has exactly one Decision Record (injective), and every non-transition record carries `transition: null`** (F-23).
+**Validation rules:** (a) a `DENY` based on a delegated verdict, and every `PREEMPT` and `EVICT`, require at least one non-`self:` citation; a `DENY` based on a module-owned rule (scope boundary, Max Night Span, queue cap, or Job Spec validation) and an `EXPIRE` on a Retention Deadline may cite `self:` alone (F-1, §6.4); (b) any record with zero citations is rejected by the emitter and **the transition it describes is not applied** — fail closed, and the rejection is logged as an `EMITTER_REJECTED` integrity event; (c) `summary` must satisfy §6.1; (d) records are immutable and append-only; (e) emission is durable before the transition is committed, not after; (f) **every transition has exactly one Decision Record (injective), and every non-transition record carries `transition: null`** (F-23).
 **Outputs:** A durable Decision Record for every transition; an integrity count of records against transitions.
 **Testable condition:** Across a 30-night simulated run, every transition has exactly one Decision Record, every record names a transition or carries `transition: null`, and zero records have an empty `citations` array; a deliberately citation-less denial is refused by the emitter, the job is left in its prior state, and an `EMITTER_REJECTED` integrity event is logged.
 
@@ -635,7 +701,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 - **NFR-1 — Single time authority.** No component outside the Daemon Clock module reads wall-clock or process time. Test: static analysis of all source modules finds exactly one time-reading call site class. Violation is a build failure.
 - **NFR-2 — Admission Order latency.** Computing the Admission Order and all placements for a 31-Node (33-slot) fleet with 500 pending jobs completes in **≤ 200 ms at p95** over 1000 consecutive runs. Tolerance: p99 ≤ 500 ms. This budget **excludes Checkpoint digest hashing**, which is no longer part of activation — hashing moved to the 21:30 pre-verification phase (§7.5, F-16) and has its own budget in NFR-8.
 - **NFR-3 — Decision latency.** Per-job eligibility and priority evaluation completes in **≤ 50 ms at p95**. Tolerance: p99 ≤ 150 ms.
-- **NFR-4 — Citation completeness.** **100%** of Decision Records carry ≥ 1 citation, and **100%** of `DENY` records based on a **delegated verdict**, and **100%** of `PREEMPT`, `EVICT`, and `EXPIRE` records, carry ≥ 1 non-`self:` citation. A `DENY` based on a module-owned rule (scope boundary, Max Night Span, queue cap, Job Spec validation) may cite `self:` alone (F-1). Tolerance: zero, absolute, no sampling. A single violation fails the build.
+- **NFR-4 — Citation completeness.** **100%** of Decision Records carry ≥ 1 citation, and **100%** of `DENY` records based on a **delegated verdict**, and **100%** of `PREEMPT` and `EVICT` records, carry ≥ 1 non-`self:` citation. A `DENY` based on a module-owned rule (scope boundary, Max Night Span, queue cap, Job Spec validation) and an `EXPIRE` on a Retention Deadline may cite `self:` alone (F-1, §6.4). Tolerance: zero, absolute, no sampling. A single violation fails the build.
 - **NFR-5 — Eviction timing accuracy.** SIGTERM dispatch lands within **± 2 simulated seconds** of Simulated Clock 05:45:00 and SIGKILL within **± 2 simulated seconds** of 05:53:00, at every Fast-Forward rate. Tolerance: absolute (F-21).
 - **NFR-6 — Event fidelity under Fast-Forward.** Across a 24-hour run at 1440×, the number of fired transitions equals the analytic expectation for the seed's fault schedule, with **0 dropped and 0 duplicated** events. The **oracle (F-26)** is golden scenario fixtures: each of the 4 Annex scenarios and the mandatory edge case ships its expected ordered transition list and expected transition count, and the run must match exactly.
 - **NFR-7 — Determinism.** Two runs with identical `(seed, submission_stream, fault_schedule)` produce **byte-identical** Decision Record logs. Tolerance: zero divergence. Test (F-22): a 24-hour run at 1440× versus the same run at 60× (24 minutes of real time); **plus** a 1× versus 1440× run over a 30-minute simulated slice from 05:30:00 to 06:00:00 covering the Eviction Ramp in fine detail. Both comparisons must be byte-identical.
