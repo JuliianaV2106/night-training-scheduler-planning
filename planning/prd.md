@@ -265,7 +265,7 @@ Citations are drawn only from delegated sources, formatted `authority:identifier
 
 > **EVICT** · `job_id: JOB-0417` · `node_id: ws-gpu-12` · `sim_timestamp: 2026-10-04T05:45:00-05:00`
 > **Summary:** "Night Training Scheduler stopped job JOB-0417 on ws-gpu-12 at the 06:00 morning deadline so the machine is free for 08:00 lab use; last durable Checkpoint is at step 41,200, digest `sha256:3f9a…c201`."
-> **Citations:** `self:EVICTION-RAMP-v1`, `node-state:M3/ws-gpu-12@2026-10-04T05:44:58Z`
+> **Citations:** `self:EVICTION-RAMP-v1`, `node-state:M3/ws-gpu-12@2026-10-04T05:44:58-05:00`
 > **Inputs:** `elapsed_runtime_s: 28140`, `checkpoint_budget_s: 300`, `estimated_total_s: 111600`, `progress_fraction: 0.252`
 
 ### 6.4 Transition → Decision Record map
@@ -437,7 +437,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **Inputs:** Entitlement verdict (M1), quota verdict (M8), policy verdict and freeze state (M2), model record (M5).
 **Validation rules:** (a) all four must be present; (b) any missing verdict is a blocking error, never a default ALLOW; (c) a `freeze` state from Module 2 admits zero jobs and is re-evaluated at **every** activation attempt (FR-8(e)), not cached for the night `[ASSUMPTION: A-16]`; (d) **the Module 5 model record is re-checked at every Window Activation (F-6)** — a job whose model was deprecated since submission transitions to `FAILED` with reason `MODEL_DEPRECATED` and a `catalog:M5/<model-id>@<version>` citation, before any placement, so a queued job never wakes only to fail on first use; (e) if the deprecation verdict is itself missing at activation, the job is deferred with a cited reason rather than assumed healthy.
 **Outputs:** A consolidated admission verdict feeding FR-1 and FR-8; the individual verdicts are attached to the resulting Decision Record as citations.
-**Testable condition:** With the Module 2 quota source returning 503, 100 consecutive submissions produce 100 refusals and 0 admissions; with the freeze state active, Window Activation admits 0 jobs and every Eligible Node is reported idle with the freeze cited; a job whose model record flipped to deprecated while it waited is `FAILED` with reason `MODEL_DEPRECATED` and a `catalog:M5/…` citation after the next activation.
+**Testable condition:** With the Module 8 quota source returning 503, 100 consecutive submissions produce 100 refusals and 0 admissions; with the freeze state active, Window Activation admits 0 jobs and every Eligible Node is reported idle with the freeze cited; a job whose model record flipped to deprecated while it waited is `FAILED` with reason `MODEL_DEPRECATED` and a `catalog:M5/…` citation after the next activation.
 
 #### FR-7: Bound the Pending Set
 
@@ -626,7 +626,7 @@ Every `EVICTED_RESUMABLE` job's resume depends on its Checkpoint digest being ve
 **System responsibility:** Let Ines see what will happen and Kavita see what happened.
 **Trigger:** Any status query; a polling interval; a state change.
 **Inputs:** The Pending Set; the Admission Order; live job states; Node states.
-**Validation rules:** (a) every state a job can occupy is one of the nine in §4.1 and no other; (b) the status surface renders the citation list for any decision it displays; (c) polling at 1 Hz over 500 jobs returns within the NFR-9 budget; (d) the board shows idle Nodes with a reason, never a blank.
+**Validation rules:** (a) every state a job can occupy is one of the nine in §4.1 and no other; (b) the status surface renders the citation list for any decision it displays; (c) polling at 1 Hz over 500 jobs returns within the NFR-9 budget; (d) the board shows idle Nodes with a reason, never a blank; an Eligible, free slot that no pending job needs carries the reason code `FREE` (surplus capacity), distinct from the exclusion codes `M3_CORDONED`, `M4_RESERVED`, `VRAM_CLASS_INSUFFICIENT`, `NO_ELIGIBLE_NODE`, `CAPACITY_EXHAUSTED`.
 **Outputs:** A status response and a board view.
 **Testable condition:** A query for `JOB-0417` returns state, position or placement, the last 10 Decision Records with citations, and a `next_decision_at` instant; the board displays all 32 Nodes (33 GPU slots) and every idle slot carries a reason string.
 

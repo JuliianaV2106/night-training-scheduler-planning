@@ -13,3 +13,4 @@ _bmad/
 # Archivos de trabajo internos de los agentes BMad/WDS (no son entregables)
 .memlog.md
 _bmad-output/
+_progress/

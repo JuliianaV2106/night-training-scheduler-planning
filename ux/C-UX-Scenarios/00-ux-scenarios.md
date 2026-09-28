@@ -4,7 +4,7 @@
 **Created:** 2026-09-28
 **Phase:** WDS Phase 3 (UX scenario outlines)
 **Trigger document:** `planning/prd.md`
-**Companion design artifacts:** `ux/DESIGN.md` · `ux/EXPERIENCE.md` · `ux/WIREFRAMES.md` (if present)
+**Companion design artifacts:** `ux/DESIGN.md` · `ux/EXPERIENCE.md` · `ux/wireframes/01-status-board.md` · `ux/wireframes/02-job-detail.md` · `ux/wireframes/03-submission-form.md`
 
 > **Trigger-document substitution — applies to all four files.** WDS Phase 3 normally derives scenarios from a Trigger Map produced in Phase 2. No Trigger Map exists for this project; Phases 1 and 2 were never run. `planning/prd.md` is used as the substitute, because it supplies the same three things a Trigger Map would: named personas (§2.1), stated jobs-to-be-done (§2), and a success-metric set (§13). Recorded in each file as S1-Q1, S2-Q1, S3-Q1 and S4-Q1 rather than papered over.
 
@@ -279,3 +279,24 @@ Recorded rather than invented around. Each is a place where a designer will have
 - **The third state that must not be mis-rendered, and it is the subtler of the three** (scenario 1, NP-1.8): `EXPIRED` is terminal and inert *while the Checkpoint beside it is live, retained and recoverable for a 7-day grace period.* A surface that dims the artifact to match the badge tells a student her work is gone when it is on disk. The badge is the only near-neutral one in the palette precisely because it is an absence — a saturated red would be a lie about severity — and a Checkpoint countdown to garbage-collection eligibility has to sit right next to it.
 - **The accessibility contract** in `EXPERIENCE.md` that the scenarios rely on: slot cells are a real `role="grid"` with a two-field accessible name (`‹node_id› slot ‹n›, ‹occupancy label›, ‹eligibility label if any›`), every glyph is `aria-hidden`, a slot held by another submitter's job reads `occupied by another job` with no identifier, and a **new Decision Record gets a `role="alert"` node on first appearance** — the two highest-stakes records in the product are Kavita's UJ-1 submission refusal and the UJ-4 preemption refusal, and a screen-reader user who acts and hears nothing cannot tell success from failure.
 - **The board does not navigate away from under a reader** when a decision fires. Every flow in this set enters as a banner, not a screen change.
+
+---
+
+## 10. Phase 4 — surface and wireframe cross-reference
+
+**Added 2026-09-28 by WDS Phase 4.** The header of this file (lines 7, 11) references `ux/WIREFRAMES.md` "(if present)". No such file exists. The Phase 4 wireframes are **three files under `ux/wireframes/`**, and the page specifications live in a `## Page Specifications` section at the foot of each scenario file. This table is the map between the two.
+
+| Surface | Specified in | Rendered in |
+|---|---|---|
+| **SURF-01** Submission form | [`scenario-1.md`](./scenario-1.md) | [`../wireframes/03-submission-form.md`](../wireframes/03-submission-form.md) |
+| **SURF-02** Board · **02a** status strip · **02b** clock | [`scenario-2.md`](./scenario-2.md) | [`../wireframes/01-status-board.md`](../wireframes/01-status-board.md) |
+| **SURF-03** Admission Order · **03b** Pending Set | [`scenario-2.md`](./scenario-2.md) | — |
+| **SURF-04** Job detail · **04b** Decision Record detail | [`scenario-1.md`](./scenario-1.md), deltas in [`scenario-3.md`](./scenario-3.md) and [`scenario-4.md`](./scenario-4.md) | [`../wireframes/02-job-detail.md`](../wireframes/02-job-detail.md) |
+| **SURF-05** Event log | [`scenario-2.md`](./scenario-2.md), deltas in [`scenario-3.md`](./scenario-3.md) and [`scenario-4.md`](./scenario-4.md) | — |
+| **SURF-06** Admin shell · **06a** Cordon clearance · **06b** Priority administration | [`scenario-3.md`](./scenario-3.md), [`scenario-4.md`](./scenario-4.md) | — |
+| **SURF-07** Node detail · **SURF-08** Quarantine release | [`scenario-3.md`](./scenario-3.md) | — |
+| **SURF-09** Activation panel · **SURF-10** Simulation run panel | [`scenario-2.md`](./scenario-2.md) | — |
+
+**Each surface is specified exactly once**, in the scenario where it is first reached; every other scenario cross-references it and adds only its own delta. The full registry, the token conflicts resolved in `DESIGN.md`, and the six design decisions taken where the PRD is silent are in [`../_progress/00-design-log.md`](../_progress/00-design-log.md). The `[V]` audit — 37 non-happy paths and 32 record types traced, 9 findings, 0 blocking gaps — is in [`../_progress/validation-report.md`](../_progress/validation-report.md).
+
+**Two of the nine findings are in this file's own header and are not repaired here**, because it is a Phase 3 artifact: the dangling `WIREFRAMES.md` reference above, and the fact that §8's 23 open questions are now 17 distinct issues with none closed by Phase 4. **Phase 4 invented no answers to any of them.**

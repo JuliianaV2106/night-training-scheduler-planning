@@ -310,3 +310,198 @@ Carried as a near-miss in NP-3.1 rather than as a failure. Restated because it i
 **S3-Q4 — FR-23(i)'s false positive has no remediation affordance.** The limitation is explicit that a Checkpoint write failure caused by kubelet DiskPressure is a possible false positive rather than a faulty Node, and that the cordon reason names the failure so Ines can distinguish the two. The PRD specifies the *reason string* but no action Ines can take to record "this was DiskPressure, not hardware" — she must make that judgement from evidence with nowhere to put it. NP-3.2b renders the evidence and leaves the distinction with her.
 
 **S3-Q5 — The rate control's initial state is unstated (shared with S1-Q5, S2-Q5).** FR-28(a) fixes the rate set (1×, 60×, 360×, 1440× plus pause). What a run *starts* at, and whether a rate survives a page reload mid-Ramp, is unspecified — and it bites hardest here, because an operator watching an 8-minute Ramp at 1440× may never see the 05:50:00–05:53:00 reserve at all.
+
+---
+
+## Page Specifications
+
+> **Phase 4 — WDS UX design.** Canonical specifications for **SURF-06** (administrator shell), **SURF-06a** (Cordon clearance), **SURF-07** (Node detail), **SURF-08** (Quarantine release), plus **deltas** to SURF-04 Job detail, SURF-04b Decision Record detail and SURF-05 Event log. `scenario-1.md` owns SURF-04/04b and `scenario-2.md` owns SURF-05; this file specifies only what the dawn Ramp adds to them. Sources, in precedence order: `planning/prd.md` → `ux/EXPERIENCE.md` → `ux/DESIGN.md` → this section. Conventions are stated once in `scenario-1.md`.
+
+### SURF-06.1 The administrator shell
+
+**Persona: `LAB_ADMIN` only** (FR-31(c)). Reached from the Board's left rail as **`Handover`**, `g w` — a name chosen for the 08:00 job Ines actually walks in to do, not for the entities involved.
+
+The PRD names no morning-handoff surface. What it *does* name is a set of facts that land on a human between 05:46 and 09:00 with **no other owner**: FR-23(i) names a human clearing a cordon, FR-20(d) names a human releasing a quarantined Checkpoint, FR-27(f) notifies the lab administrator on Checkpoint failure, and FR-24 records a Cordon Request that may be **rejected** by Module 3. Four PRD obligations, three actor-specific surfaces, and no index connecting them — so the shell is a design decision, not a requirement, and is **flagged for review (S3-Q7)**.
+
+| Block | Content |
+|---|---|
+| **Suspect Nodes** | One row per cordoned Node: `node_id`, the **cordon cause string**, the incident `sim_timestamp`, and the clearance status. Default sort — most recent first, because Ines's first question at 08:00 is *what happened last night*. |
+| **Outstanding obligations** | Quarantined Checkpoints awaiting release, each with its owner and the fact that FR-22(c) protects it from automatic removal. A quarantined Checkpoint is a **live liability with a named owner**; an unowned one is how it becomes a permanent store leak. |
+| **Unacknowledged Cordon Requests** | A Cordon Request that **Module 3 rejected** (FR-23(h)) — recorded, with the local exclusion still in force. See SURF-06.3. |
+| **Recent notifications** | The `LAB_ADMIN` side of FR-27, the outbox from `scenario-2.md` § SURF-05. |
+| **Fleet release count** | The Invariant S-1 answer for the 06:00 boundary, stated as a number. |
+
+**Nothing here auto-clears and nothing expires.** The same rule as every other surface in this module: no banner dismisses itself, no badge times out, and the 08:00 surface still carries the 05:46 incident at 17:00. An operator who closes a tab and comes back must not have to reconstruct what the night did from memory.
+
+### SURF-06.2 Node detail — SURF-07
+
+**Entry:** any slot tile → `Enter`, `g n`, or the Board's tile inspector.
+
+| Block | Content |
+|---|---|
+| **Identity** | `node_id`, VRAM class and count — `ws-gpu-19`, 1 × 24 GB; `server-gpu-01`, 2 × 48 GB. |
+| **Health** | The last Module 3 reading, the reading's `sim_timestamp`, and the transition-time failure points (FR-23(d)(1)(2) calls out kubelet eviction and disk errors specifically). |
+| **Current cordons** | Every active cordon with its **cause string**, the incident instant, and the state of the outbound Cordon Request. |
+| **Cordon / Clear cordon** | The single mutation this surface owns. `LAB_ADMIN` only. |
+| **Assigned jobs** | Occupants of the Node's slots. |
+| **History** | Events for this Node, linking to SURF-05. |
+
+**Clearing a cordon is the panel's only write.** One verb, one actor, one irreversible-ish consequence — so Node detail is a **read surface plus exactly one action**, and every other affordance is a link. The panel it opens is SURF-06a.
+
+**The slot inspector, once the tile is too narrow to read.** Because a `draining` countdown and a cordon cause string cannot both live in a 44px tile at the desktop floor, the tile keeps a **hover/focus tooltip carrying the cause string unabbreviated**, and `Enter` promotes the tile to a full-width inspector row beneath the grid. The cause string is never truncated in the accessible name.
+
+### SURF-06.3 Cordon clearance — SURF-06a
+
+**Ines's decision surface, and the reason this scenario's second persona exists.** `LAB_ADMIN` only; the action is **absent from `Kavita`'s DOM entirely** (FR-31(c)).
+
+The panel shows three things, in this order, because the order is the argument:
+
+1. **The cause** — `EVICTION_CHECKPOINT_WRITE_FAILED`, the incident `sim_timestamp`, and the affected `job_id`.
+2. **The evidence** — the write-failure evidence from `node-state:M3/…`: the failed write, the node's kubelet state, its disk state, and any concurrent transitions. FR-23(i)'s false positive is a **kubelet DiskPressure** condition rather than a faulty Node, and the PRD's stated remedy is the *reason string* — so the reason string and the evidence must both be on screen, unabbreviated, or the whole limitation is decorative.
+3. **The consequence statement** — see below.
+
+> **The sentence that makes this panel honest:**
+> *Clearing this cordon returns `ws-gpu-19` to the Eligible Node set at its next health evaluation. It does **not** release the job. `EVICTION_FAILED` re-admits tonight onto a different Eligible Node (T-20).*
+
+Without that sentence Ines closes the incident believing she unblocked a student's run. It is the highest-value sentence in the module and the PRD's state machine does not require it.
+
+| Property | Specification |
+|---|---|
+| **Actor** | The clearing principal is recorded on the event (FR-26(c)). The panel shows who is acting **before** the click. |
+| **Confirmation** | Requires an explicit confirm naming the Node and the cause. Clearing a cordon is a safety-relevant act, so unlike the clock control (SURF-02b) this **does** confirm. |
+| **Eligibility return** | *At the next health evaluation* — never immediately on click, and the panel says so. A cordon dropped by fiat rather than by a health reading is a state no invariant in the PRD is written against. |
+| **Event** | `CORDON_CLEARED` — a **distinct event type with an actor** (FR-26(c)), not a status flip. It appears in SURF-05 **exactly once**, alongside exactly one `CORDON` and exactly one `FAIL` (FR-23's testable condition). |
+| **Effect on the job** | **None.** T-20 re-admits onto **any** Eligible Node, explicitly *not* the cordoned one. The panel repeats this. |
+| **No remediation affordance** | FR-23(i) has none (**S3-Q4**). The panel renders the evidence and leaves the DiskPressure-versus-hardware judgement with Ines. Inventing a "mark as DiskPressure" control would be a design decision presenting itself as a PRD feature, and no PRD requirement backs it. |
+| **Loading · Empty · Error** | Loading: the evidence block in skeletons at final geometry. Empty: no active cordons — `No active cordons.` Error: the health reading is unavailable, in which case clearance is **disabled and the reason stated**; clearing against an unread health reading is the one action in this module that can make a machine worse. |
+
+**A rejected outbound Cordon Request (FR-23(h))** renders as a **cause change on the slot tile plus an event-log entry** (**S3-Q3**): the local exclusion persists for the rest of the night and is labelled *locally not-Eligible, Module 3 rejected the request* rather than `M3_CORDONED`. The distinction is a correctness fact — the exclusion is this module's own conservatism, not a health verdict — and collapsing it into the normal cordon cause would have Ines clear a node that Module 3 never believed was sick.
+
+### SURF-06.4 Quarantine release — SURF-08
+
+**Entry: the `FAILED` badge on Job detail → Checkpoint Quarantine.** Design decision **D-d**: the release lives under the **job**, not the Node, because a corrupt Checkpoint is a property of a *file* and is **not evidence of a faulty Node** (FR-20(e)).
+
+| Property | Specification |
+|---|---|
+| **Evidence** | The recorded digest, the recomputed digest, the byte count, the step, and the `sim_timestamp` of verification. The mismatch is shown as two values, never as a boolean. |
+| **Required reason code** | A reason code is mandatory on release; a free-text-only field would make the release unauditable. |
+| **Actor** | Recorded. The panel states who owns the obligation. |
+| **FR-20(e), stated on the panel** | *Releasing a quarantined Checkpoint does not return any Node to service, and a corrupt Checkpoint is never evidence of a faulty Node. No Cordon Request was issued.* |
+| **Hard rendering constraint** | The surface must **not** grey out a slot tile, **not** imply the node is suspect, and **not** offer a link toward a cordon action. A corrupt file and a sick machine look similar on a status board and mean opposite things. |
+| **Protection** | A quarantined Checkpoint is excluded from garbage collection until released (FR-20(d)) and never removed automatically (FR-22(c)). The panel says it is protected, because "protected" and "will never be cleaned up" are the same sentence to whoever finds it in six months. |
+| **Not a tenth state** | `CHECKPOINT_CORRUPT` is a **reason code on `FAILED`**, not a state. FR-25(a): the badge set has nine and no other. |
+| **Invariant S-2 caveat** | This `FAILED` is **not** one of the three exits that end a job with admitted work incomplete *and* a retained verified Checkpoint under the 7-day grace — the last verified Checkpoint is the one that failed verification, which is precisely why it is in Quarantine rather than retained. |
+| **Loading · Empty · Error** | Loading: skeleton evidence rows. Empty: `No Checkpoints in Quarantine.` Error: digest evidence unavailable → release disabled, reason stated. |
+
+### SURF-04 deltas — the Ramp, on Job detail
+
+Canonical surface in `scenario-1.md`; the dawn Ramp adds these blocks.
+
+**The five-step durability sequence renders as evidence, not as a spinner.** FR-18(a), in order, with the current step marked:
+
+```
+write to a temporary file  →  fdatasync the file  →  atomic rename into the final path
+                           →  fsync the parent directory  →  compute and record the SHA-256 digest
+```
+
+The **`fsync` the parent directory** step is called out by name and given equal weight, because `prd-addendum.md` §B.2 measures an unsafe Checkpoint surviving **0 of 430** crash injections without it, and it is the step a developer omits. A reader who has never seen a Checkpoint implementation is being told *why this takes eight minutes*, and the answer is a directory `fsync`.
+
+- **All five or nothing** (FR-18(b)). The digest, byte count, step number and `sim_timestamp` are recorded **together or not at all** (FR-18(c)) — the surface therefore shows a single "verified" row that is either complete or absent, never a digest without a byte count.
+- **A partial or undurable Checkpoint is deleted, never surfaced** (FR-18(d)). NP-3.7: a `draining` tile that has visibly written its file is still `draining`, because there is no intermediate "checkpoint written" state. A surface showing a partial write as success would claim a durability the system does not have.
+- **The 300 s Checkpoint Budget and the 05:50:00–05:53:00 reserve render as two distinct phases** on the `CHECKPOINTING` badge. **The reserve is still usable** (FR-19(b), F-7) — a Checkpoint verified any time before 05:53:00 satisfies T-8 — so nothing in the UI may present the reserve as expired or degraded. It is the safety margin, and the surface says so.
+- **The completion record supersedes, visibly.** T-8 keeps `decision: EVICT` and sets `supersedes` to the T-6 record id, mirroring T-6's citations. Rendered as a `supersedes ‹decision_id›` link above the eyebrow in SURF-04b. Records are immutable and append-only, so a revised decision is a new record linked to its predecessor — **never an edit**.
+
+**Ramp-scoped vs budget-scoped countdown — the rule that makes `draining` honest.**
+
+| Context | Tile text |
+|---|---|
+| **Inside the Eviction Ramp** (deadline real) | `draining · SIGKILL in mm:ss`, counting to 05:53:00 |
+| **Outside the Ramp** (e.g. a 23:10 preemption) | `draining · checkpointing · elapsed ‹n›s / 300s`, **no SIGKILL reference** |
+
+FR-19(d) and Invariant S-1 govern the dawn Ramp, where a slot may be held until 06:00:00. FR-16(d) pins **no** deadline on a preemption drain (**S3-Q2**), and the Checkpoint Budget (A-9) is defined as the 300 s window *inside* the Ramp. A `draining` tile that always quoted a 05:53:00 countdown would be quoting a deadline that does not exist at 23:10 — so **the countdown is Ramp-scoped and the budget is not**.
+
+**`EVICTED_RESUMABLE` and `FAILED` must never be confusable.** The single most important rendering decision in this scenario. A clean dawn eviction is **the module working correctly**:
+
+| | `EVICTED_RESUMABLE` | `EVICTION_FAILED` |
+|---|---|---|
+| Token | `{colors.state-evicted-resumable}` violet | `{colors.state-eviction-failed}` `#FFA657` |
+| Glyph | `‖` | `⚡` |
+| Label | Evicted, resumable | Eviction failed |
+| Terminal ring | **no** | **no** — T-20 returns it to the Pending Set |
+| Resume point | verified digest, byte count, step | **retained** last verified Checkpoint |
+| Node | released | released |
+
+`{colors.state-eviction-failed}` appears **nowhere else** in either job-state set — checkable, and stated as checkable. The documented limit: under deuteranopia `{colors.state-rejected-light}` and `{colors.state-eviction-failed-light}` converge to roughly **dE 1.6**, so hue alone would not separate a *refused* job from a *failed eviction* in the light theme. **The glyph (`⚡` against `✕`) and the label carry it** — colour is the third channel in this system and never the first.
+
+**The word "stopped" is banned** on every surface here. UJ-3's climax is `EVICTED_RESUMABLE` with a verified digest, "not 'stopped.'" Notification copy is plain and technical: *"Stopped cleanly. Last durable Checkpoint is step 41,200, digest `sha256:3f9a…c201`."* Not "Saving your progress…". Nothing in this system congratulates the user, apologises to them, or celebrates.
+
+**`PROCESS_EXIT` branches render differently because the work differs** (T-22 / T-23, F-10):
+
+| Branch | Renders |
+|---|---|
+| **T-22** — verified Checkpoint exists, fewer than 1 automatic retry used tonight | `EVICTED_RESUMABLE`, `PROCESS_EXIT`, `node-state:M3/…`. The retry badge shows it was the **first** retry. |
+| **T-23** — no verified Checkpoint for this run segment | `FAILED`, `PROCESS_EXIT_NO_CHECKPOINT` (`OOM_KILLED` / `PROCESS_EXITED`), the retained-Checkpoint statement, and — for `OOM_KILLED` — the **mandatory cited remediation** suggesting a lower batch size or a 48 GB-class Node, i.e. `server-gpu-01` (FR-29(a)). |
+
+**The one-retry-per-night cap is a governance rule, not a fault.** A job that has exhausted it is **not** presented as retryable. "You can try again" on a job the policy will refuse is a promise the daemon will break tonight.
+
+**Per-Node release is independent and immediate** (FR-19(d)): each Node's allocation is released on that job's exit, **not** at 05:53:00. At 05:44:50 a `running` tile reads `draining`; at 05:46:01 `ws-gpu-19` reads `cordoned` while every other job's slot is already `available` — the board must not hold every slot until the hard deadline and report jobs as held minutes after their allocations were returned.
+
+### SURF-05 deltas — the Ramp's event rows
+
+Canonical surface in `scenario-2.md`; the Ramp adds three row shapes, each **exactly once** per incident (FR-23's testable condition).
+
+**`CORDON`**
+
+```
+05:46:00  CORDON          ws-gpu-19  EVICTION_CHECKPOINT_WRITE_FAILED
+          Checkpoint Request issued to Module 3; Node not Eligible for the remainder
+          of the night and until a human clears it.            [node-state:M3/…] [self:EVICTION-RAMP-v1]
+```
+
+Optimistically pending Module 3's acknowledgement (A-15), which the row states — the exclusion is this module's decision until Module 3 agrees, and the copy must not imply a health verdict Module 3 never returned.
+
+**`CORDON_CLEARED`** — a **distinct event type with an actor** (FR-26(c)), not a status flip:
+
+```
+08:05:00  CORDON_CLEARED  ws-gpu-19  actor: ines.okonkwo
+          Cordon cleared; Node returns to the Eligible set at its next health
+          evaluation. The associated job was not blocked by this cordon.        [self:CORDON-CLEARANCE-v1]
+```
+
+**`FAIL`** — reason-scoped, and the reason is the whole content:
+
+```
+05:46:00  FAIL            JOB-0417   CHECKPOINT_WRITE_FAILED
+          Checkpoint write failed; last verified Checkpoint retained, byte-identical.
+          Node allocation released 05:46:01.                    [node-state:M3/…] [self:EVICTION-RAMP-v1]
+```
+
+**Failures and cordons are recorded with the same rigour as successes** (FR-26(b)) — that clause exists because the alternative is a log that only remembers the good parts. The `DELIVERY_FAILED` and `EMITTER_REJECTED` row shapes are in `scenario-2.md`.
+
+**`EVICT` and the completion pair.** T-6 and T-8 are **one** Decision chain: FR-24(f) counts one record per transition and FR-19's "one `EVICT` Decision Record per job" counts one decision. The log renders them as **two rows linked by `supersedes`**, so the replay key is intact and the chain is legible. Rendering them as two decisions would overstate the count FR-19 constrains.
+
+### SURF-04b deltas — Ramp decisions and the notification record
+
+**`EVICT` (T-6 / T-8).** Citations `self:EVICTION-RAMP-v1` **and** `node-state:M3/…`. **The non-`self:` citation is unconditional** — every `EVICT` and every `PREEMPT` requires at least one non-`self:` citation, without exception (FR-24(a), NFR-4, F-1). A user's work being stopped may never be justified solely by a time or bookkeeping reason, and the record's citation list is where that is checked.
+
+**`FAIL` reasons in this scenario, with their permitted citation classes** (F-1 governs, and the classes differ):
+
+| Reason | `self:` alone permitted? | Citations |
+|---|---|---|
+| `CHECKPOINT_DEADLINE_MISSED` (T-9) | **yes** — a time rule (§6.2) | `self:EVICTION-RAMP-v1` |
+| `CHECKPOINT_WRITE_FAILED` (T-10) | no | `node-state:M3/…`, `self:EVICTION-RAMP-v1` |
+| `CHECKPOINT_CORRUPT` (T-13) | **yes** | `self:CHECKPOINT-QUARANTINE-v1` |
+| `NODE_FAULT_NO_CHECKPOINT` (T-17) | **no** — a delegated telemetry authority | `node-state:M3/…` |
+| `MAX_NIGHT_SPAN_EXCEEDED` (T-19 guard) | **yes** — named module-owned class | `self:MAX-NIGHT-SPAN-v1` |
+
+**`DEFER` / `DAEMON_RESTORE` (T-18).** Restoration makes **no new decision** and defers everything to the separate reconciliation step; job states are `unchanged` and **no transition is replayed**. The record is visibly a *restore*, not a *recovery* — a board that re-ran the Ramp would show Checkpoint writes the disk has already accepted (NP-3.8). NFR-10's tolerance is zero: **0 committed transitions lost, 0 duplicated**, which is why emission is durable *before* the transition commits (FR-24(e)).
+
+**The T-20 recovery guard is visible before it is relied on.** A job in `EVICTION_FAILED` needs **a verified Checkpoint retained AND Admitted Nights < Max Night Span**; otherwise **T-19** applies and the job is refused. The `EVICTION_FAILED` badge therefore states both preconditions rather than promising a recovery FR-4(d) may refuse — Invariant S-3, so span exhaustion never manifests as a wasted night. When T-19 does fire, the refusal record names `MAX_NIGHT_SPAN_EXCEEDED` **rather than silently evicting** (FR-21(f)), and states the retained Checkpoint and the step it reached, so a human can decide whether to resubmit a reduced scope.
+
+**Notifications (FR-27).** An Eviction produces **exactly one** notification, to the submitter, and **none to the administrator** — the difference from a Checkpoint failure is load-bearing and is asserted in FR-27's testable condition. A Checkpoint failure produces **exactly two**: the submitting principal and the lab administrator, with the Node named and the resume point stated (FR-23(f)). The notification record is visible in the Notification tab of SURF-04b for the submitter, and in SURF-06 for the administrator.
+
+**Delivery never blocks the transition, and never delays the release by more than 0 ms** (FR-23(a), FR-27). A `DELIVERY_FAILED` row in the log and a stale `draining` tile is the *forbidden* combination: the board must not hold a tile past 05:46:01 because a notification is slow. **This is the one path in the module where a slower UI would be a correctness failure.**
+
+**Store pressure at 03:00** (FR-22(d), NFR-13) renders as a board capacity banner and as a Job detail notice on affected jobs, both stating that **the 2 most recent verified Checkpoints of a non-terminal job and every Quarantined Checkpoint are never removed automatically** — a single protected deletion fails the build. Cross-referenced from scenario 1's NP-1.7, where the same budget produces a submission *refusal*; the same fact is a refusal to a submitter and a capacity notice to an operator, and neither surface may imply the other.
+
+**No banner auto-dismisses, and no countdown disappears.** A `draining` countdown that hits 05:53:00 **stays visible** with the reason the work stopped. Nothing expires the operator's ability to read why their job was stopped at 09:00.

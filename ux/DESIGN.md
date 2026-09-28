@@ -178,7 +178,7 @@ components:
     padding: '{spacing.banner-inset}'
     borderLeft: '3px solid'
     summary: '{typography.body}'
-    citation: '{typography.mono-data}'
+    citation: '{typography.mono-label}'
     groupGlyph: 'one per group, aria-hidden; the group word in the eyebrow is the accessible channel'
   citation-chip:
     radius: '{rounded.sm}'
@@ -378,7 +378,7 @@ An earlier draft expressed terminality as "non-terminal badges sit on `{colors.s
 
 ### `node-slot-tile` — the 5 slot states
 
-A 44px `{rounded.md}` tile, 1px `{colors.border-subtle}`, carrying the slot's ordinal, its state glyph, its state label at `{typography.mono-label}`, and — when occupied — the `job_id` at `{typography.mono-data}` truncated to 8 characters with the full value in the accessible name and the tooltip.
+A 44px `{rounded.md}` tile, 1px `{colors.border-structure}`, carrying the slot's ordinal, its state glyph, its state label at `{typography.mono-label}`, and — when occupied — the `job_id` at `{typography.mono-data}` truncated to 8 characters with the full value in the accessible name and the tooltip.
 
 `server-gpu-01` renders as a paired tile with a shared node header above both slots, because the two slots are independent but the node is one machine and Ines reasons about the machine. The per-slot independence is preserved inside the pair: slot 0 `running` and slot 1 `reserved` is a legal and common display, and the two tiles are visually independent even though they share a header.
 
@@ -390,7 +390,7 @@ One component, `{rounded.md}`, `{spacing.banner-inset}` padding, a 3px left bord
 
 | Group | Variants | Left border | Weight |
 |---|---|---|---|
-| adverse | `DENY` `DEFER` `PREEMPT` `EVICT` `EXPIRE` `FAIL` `CORDON` | `{colors.state-rejected}` for `DENY`/`DEFER`, `{colors.state-eviction-failed}` for `EXPIRE`/`CORDON`, `{colors.state-failed}` for `PREEMPT`/`EVICT`/`FAIL` | group glyph `!`, full-opacity 3px border, `{colors.surface-raised}` fill |
+| adverse | `DENY` `DEFER` `PREEMPT` `EVICT` `EXPIRE` `FAIL` `CORDON` | `{colors.state-rejected}` for `DENY`/`DEFER`/`FAIL`, `{colors.state-eviction-failed}` for `EXPIRE`/`CORDON`, `{colors.state-failed}` for `PREEMPT`/`EVICT` | group glyph `!`, full-opacity 3px border, `{colors.surface-raised}` fill |
 | neutral / positive | `ADMIT` `RESUME` `COMPLETE` | `{colors.node-available}` | group glyph `✓`, 3px border at 60% opacity, `{colors.surface-base}` fill |
 
 **Every variant renders the `summary` and the full `citations` list. Only the visual weight differs between groups - and the group is never signalled by hue alone.** A `PREEMPT` banner and an `ADMIT` banner carry the same eyebrow, the same summary treatment and the same citation row, so if the group lived only in the border colour it would live only in colour. It does not: the eyebrow opens with a group glyph and the group word (`Decision · deny` against `Decision · admit`), and the border weight differs. The fill difference between `{colors.surface-raised}` and `{colors.surface-base}` is 1.09:1 and is therefore treated as decoration, never as a signal. An earlier draft leaned on it, which would have left the two groups identical to any reader who cannot separate the hues - and under deuteranopia the adverse and positive borders land roughly dE 6.8 apart. A refusal that looks like an admission is the worst failure this component can have.
@@ -433,7 +433,7 @@ Persistent, full-width, `{typography.mono-label}`. Carries the daemon connection
 | Show a `draining` slot for the whole 05:45:00–05:53:00 Ramp, with a countdown to SIGKILL | Show a slot held by a `CHECKPOINTING` job as `available`; S-1 permits the hold until 06:00:00 |
 | Give every idle slot a reason string (FR-25(d)) | Render an idle slot blank, or with a bare en dash |
 | Render `summary` + full `citations` on **all 10** banner variants | Strip citations from a low-weight `ADMIT` or `RESUME`; SM-5 and FR-25(b) are absolute |
-| Render non-`self:` citations in `{colors.accent}` and `self:` in `{colors.text-muted}` | Style all citations identically; the F-1 split rule stops being visible |
+| Render every citation in `{colors.citation-ink}`, with non-`self:` authorities weighted heavier than `self:` | Style all citations identically (the F-1 split rule stops being visible), or use `{colors.accent}` / `{colors.text-muted}` for citations (`text-muted` is 4.37:1 on the chip ground, under the 4.5:1 floor) |
 | Use `{rounded.full}` for `status-badge` only | Round buttons, tiles, or panels into pills |
 | Separate depth with tonal steps and 1px borders | Use drop shadows to build hierarchy on the dark ground |
 | Keep the clock readout and rate control visible at all times, disabled when unreachable | Hide the control cluster on disconnect |
