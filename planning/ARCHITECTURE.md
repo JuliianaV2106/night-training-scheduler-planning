@@ -14,6 +14,10 @@ paradigm: "Deterministic Reducer — event-sourced discrete-event engine, one pr
 
 Binding architecture for Phase 3. Every state name, `UJ-N`, `T-N`, `FR-N`, `NFR-N`, reason code, citation authority and persona name below is taken verbatim from `planning/prd.md` and is not translated. `ux/EXPERIENCE.md` and `reviews/review-prd-adversarial.md` are inputs of equal standing. **Where this document and the PRD both speak about behaviour, the PRD wins; where both speak about structure, this document wins.** Nothing here is inferred from a document that does not exist — per PRD §0, `spec.md` and `project-brief.md` were not provided and are not inputs.
 
+**Reference convention.** A bare `§N` in this document always means **PRD §N**, because this document has no numbered sections beyond its own six. Where this document refers to itself it says "ARCHITECTURE §N" or names the AD. `T-N` identifiers are the PRD §6.4 transition ids.
+
+**Revision note (2026-09-28).** Two independent reviews (`reviews/review-arch-adversarial.md`, `reviews/review-arch-edge-cases.md`) returned 30 findings, all accepted by the team; their resolutions are applied here. Two are PRD amendments, referenced here rather than restated: **FR-31(e) now reads 404**, not 403, and **`self:DELEGATE-UNAVAILABLE-v1`** is now a registered citation authority in PRD §6.2. One identifier moved: the former AD-6 ("time and rate are separate") was absorbed into AD-1, and the freed slot became **AD-6 (Preemption)**, which FR-16 required and had no home for. AD-1 … AD-8 are now stable and citable for Phase 3.
+
 **Reference convention.** A bare `§N` in this document always means **PRD §N**, because this document has no numbered sections beyond its own six. Where this document refers to itself it says "§1"–"§6" or names the AD. The previous draft used `PRD §6.4` and `§7.x` without that convention, which made them look like broken internal cross-references to a reviewer; they were always PRD sections. `T-N` identifiers are the PRD §6.4 transition ids.
 
 **Revision note (2026-09-28).** This document previously carried `status: final` and was returned NOT SOUND by a four-lane reviewer gate. It has been revised against those findings. One identifier moved: the former AD-6 ("time and rate are separate") was absorbed into AD-1, where its rule belonged, and the freed slot became **AD-6 (Preemption)**, which FR-16 required and the previous draft had no home for. AD ids are now stable for Phase 3.
@@ -53,61 +57,65 @@ Binding architecture for Phase 3. Every state name, `UJ-N`, `T-N`, `FR-N`, `NFR-
 
 **Python 3.12+, FastAPI, SQLite, Jinja/HTMX — exact versions pinned in `requirements.txt` at implementation time.**
 
-This section deliberately carries **no version numbers and no release dates**. The previous draft pinned specific versions and dates; a reviewer gate found the pins wrong, and that failure mode recurs on any date a document outlives. The stack is a *choice of technologies*, and currency is a property of the lockfile, which is regenerated and verified at implementation time rather than asserted in an architecture document.
+This section deliberately carries **no version numbers and no release dates**. An earlier draft pinned specific versions and dates; a review found the pins wrong, and that failure mode recurs on any date a document outlives. The stack is a *choice of technologies*; currency is a property of the lockfile, which is regenerated and verified at implementation time rather than asserted in an architecture document.
 
 | Concern | Choice | Why this and not the alternative |
 |---|---|---|
-| Language and runtime | **Python 3.12+** | The only language the PRD permits (NFR-16, course constraint 1). The floor is a floor, not a pin. |
+| Language and runtime | **Python 3.12+** | The only language the PRD permits (NFR-16, course constraint 1). A floor, not a pin. |
 | API surface | **FastAPI** | Required by the PRD; supplies Swagger at `/docs` from the same Pydantic models the console renders. |
 | Persistence | **SQLite** via the standard library `sqlite3`, WAL journal, `synchronous=FULL` | One process, one writer, no server, no broker — the cheapest thing that satisfies NFR-10 and NFR-16. `sqlite3` ships with Python, so it adds no dependency. |
 | Console | **Jinja templates + HTMX**, server-rendered | ARCHITECTURE §1.2. No Node toolchain, no build step, no client-side state. |
 | Async | the ASGI server and its async layer | One event loop (AD-1). Never more than one worker process. |
 
-**Two floors are correctness constraints, not pins, and are verified at startup rather than documented here.**
+**Two floors are correctness constraints rather than pins, and are verified at startup rather than documented here.**
 
-- **SQLite must include the WAL-reset database-corruption fix.** Module 9 uses WAL with `synchronous=FULL` and a long-lived single writer, which is the configuration that bug corrupts. A store without the fix is not a supported store. Because the SQLite version is bundled with the interpreter rather than installed separately, this is a constraint on the *Python build* — a start-up check reports it clearly rather than tolerating it. (The previous draft named a specific floor version here; the check is now what enforces it, and `requirements.txt` records the resolved build.)
+- **SQLite must include the WAL-reset database-corruption fix.** Module 9 uses WAL with `synchronous=FULL` and a long-lived single writer, which is the configuration that bug corrupts. Because SQLite ships with the interpreter rather than being installed separately, this is a constraint on the *Python build*; a start-up check reports it clearly rather than tolerating it, and `requirements.txt` records the resolved build.
 - **Starlette, as a FastAPI dependency, is a breaking 1.x series.** The pre-1.0 `TemplateResponse(name, context)` signature is gone. Since the entire console is server-rendered Jinja, this is a build-time break, not a runtime surprise.
 
-**Not used, and why:** no Node/npm toolchain (NFR-16, ARCHITECTURE §1.2); no message broker or second process (NFR-10, NFR-16, course constraint 1); no Kubernetes or GPU (NFR-16); no external service of any kind (NFR-16); no ORM migration framework in v1, since the schema is created at startup from the fold's own projection rather than migrated across versions.
+**Not used, and why:** no Node/npm toolchain (NFR-16, ARCHITECTURE §1.2); no message broker or second process (NFR-10, NFR-16, course constraint 1); no Kubernetes or GPU (NFR-16); no external service of any kind (NFR-16).
 
 **Swagger** is FastAPI's auto-generated OpenAPI surface at `/docs`, generated from the same Pydantic response models the console renders (EXPERIENCE.md: it is not a degraded view).
 
 ### 1.4 Runtime, deployment and operations envelope
 
-The previous draft of this document was silent on everything in this subsection, which the reviewer gate correctly called a hole: an architecture that cannot say how it starts, where its data lives, or how it is proven is not yet an architecture.
+An architecture that cannot say how it starts, where its data lives, or how it is proven is not yet an architecture.
 
-**Two supported run modes, one artifact.** `docker compose up` (the primary path, satisfying NFR-16's standalone test) and a local virtual environment (the development path). The same image, the same entrypoint, the same data volumes. There is no build-mode difference, so the venv path cannot drift from the container path.
+**Two supported run modes, one artifact.** `docker compose up` (the primary path, satisfying NFR-16's standalone test) and a local virtual environment (the development path). The same image, the same entrypoint, the same data volumes.
 
 | Concern | Decision |
 |---|---|
-| Process model | One process, one Uvicorn worker, one asyncio loop. **Never `--workers > 1`** — a second worker is a second writer, which AD-1 forbids and which SQLite's single-writer lock would turn into `database is locked` at best. Scale-up is not a v1 concern (FR-3 refuses the multi-node scope). |
-| Data layout | `M9_DATA_DIR` (default `./data`) holding `scheduler.db` (SQLite, WAL) and `checkpoints/` (the AD-7 store root, a sibling of the DB, on a filesystem supporting atomic rename). Both are bind-mounted volumes; both survive restart. |
-| Configuration | Read once at startup from environment variables. Anything that changes scheduling must go through AD-1's enqueue channel, not through a config reload. |
-| Startup order | Verify `sqlite3.sqlite_version >= 3.51.3` (ARCHITECTURE §1.3) and **fail fast with a clear message**; create the schema; restore by folding (AD-5); rebuild the queue; then begin draining. Serving traffic before the fold completes is a defect. |
+| Process model | One process, one Uvicorn worker, one asyncio loop. **Never `--workers > 1`** — a second worker is a second writer, which AD-1 forbids. |
+| Data layout | `M9_DATA_DIR` (default `./data`) holding `scheduler.db` (SQLite, WAL) and `checkpoints/` (the AD-7 store root, a sibling of the DB, on a filesystem supporting atomic rename). Both are bind-mounted volumes. |
+| Configuration | Read once at startup. Anything that changes scheduling goes through AD-1's enqueue channel, not a config reload. |
+| Startup order | Verify the SQLite corruption-fix floor (ARCHITECTURE §1.3) and the PRD §6.4 map checksum (F-14) and **fail fast**; create the schema; restore by folding (AD-5); rebuild the queue; then begin draining. Serving traffic before the fold completes is a defect. |
+| Authentication | `POST /auth/session` exchanges a validated Module 1 fixture bearer token for an HttpOnly, SameSite=Strict session cookie; the console reads the actor from the session and applies the same `ROLE_CAPABILITY` table as the API (AD-8). A bearer token never reaches a page. |
 | Health | `GET /health` reports liveness plus pacer progress. It performs no scheduling decision and mutates nothing (AD-1). |
-| Observability | Structured logs to stdout. Decision Records are the audit surface, not the log stream. **No token, another user's `job_id`, or credential is ever logged** (AD-8). Log level is the only runtime knob beyond the AD-1 rate. |
-| Backup and restore | Back up the SQLite file with the online backup API (or `VACUUM INTO`) and the `checkpoints/` directory together. The two are not consistent with each other mid-window, and a Checkpoint without its log is unusable, so a backup is a *consistent pair* taken at a Night Window boundary. Restore is the ordinary start path — there is no separate restore mode. |
-| Data retention | The Decision Record log is append-only and grows without bound. Truncation is never silent: `GET /events` states the truncation point (FR-26). A run's artifacts are exported by `GET /simulations/{id}/artifacts`, which is the retention mechanism for simulation output. |
+| Observability | Structured logs to stdout. Decision Records are the audit surface. **No token, another user's `job_id`, or credential is ever logged** (AD-8). |
+| Backup and restore | The SQLite file and `checkpoints/` are backed up **together as a consistent pair** taken at a Night Window boundary; a Checkpoint without its log is unusable. Restore is the ordinary start path. |
+| Data retention | The Decision Record log is append-only. Truncation is never silent: `GET /events` states the truncation point (FR-26). A run's artifacts are exported by `GET /simulations/{id}/artifacts`. |
 
-**What is deliberately not designed.** No Kubernetes, no GPU, no broker, no external service, no second process (NFR-16, course constraint 1). No HA, no leader election, no multi-region. No TLS termination — a single-lab deployment behind whatever the lab's own front door provides.
+**What is deliberately not designed.** No Kubernetes, no GPU, no broker, no external service, no second process (NFR-16, course constraint 1). No HA, no leader election, no TLS termination.
 
 ### 1.5 Verification strategy and the run gate
 
-NFR-2, NFR-3, NFR-8 and NFR-9 are *performance* requirements and are not satisfied by a passing functional run; they are measured by a separate benchmark harness (F-36). The architecture's obligation is to make them reachable and to say which suite owns what.
+NFR-2, NFR-3, NFR-8 and NFR-9 are *performance* requirements and are not satisfied by a passing functional run; they are measured by a separate benchmark harness (F-36).
 
 | Suite | Owns | Gate |
 |---|---|---|
-| Unit | the pure fold, the PRD §6.4 map as data, the citation grammar, the AD-8 refusal table, the AD-4 slot arithmetic | must pass before any story merges |
-| Contract | the three event contracts of ARCHITECTURE §4.2, the PRD §6.1 record fields, the Swagger schema | must pass before the console is wired |
-| Integration | a full simulated night end-to-end: activation → steps → checkpoint → eviction ramp → `NIGHT_CLOSE` accounting → restore | must pass per epic |
-| Determinism | **F-26 golden fixtures** — the same `seed` and `submission_stream` must yield a byte-identical Decision Record log. Any drift fails the build. | must pass per epic |
-| Fault injection | NFR-10's 1000 simulated process deaths via the Fault Injector (ARCHITECTURE §2), asserting 0 duplicate transitions and 0 lost transitions | must pass per epic |
-| Preemption | AD-6's granted-tier authority, margin gate, deterministic victim order, `PREEMPTION_REFUSED`, once-per-window | must pass before the Preemption story merges |
-| Performance | NFR-2, NFR-3, NFR-8, NFR-9 under load, at 1× and 1440× | reported, not gated — F-36 |
+| Unit | the pure fold, the PRD §6.4 map as data, the citation grammar, the AD-8 refusal table, the AD-4 slot arithmetic and Node order | must pass before any story merges |
+| Contract | the three event contracts of ARCHITECTURE §4.2, the PRD §6.1 record fields, the Swagger schema | before the console is wired |
+| Integration | a full simulated night end-to-end: activation → steps → checkpoint → eviction ramp → `NIGHT_CLOSE` accounting → restore | per epic |
+| Determinism | **F-26 golden fixtures** — the same `seed` and `submission_stream` must yield a byte-identical Decision Record log | per epic |
+| Fault injection | NFR-10's simulated process deaths via the Fault Injector (ARCHITECTURE §2), asserting 0 duplicate and 0 lost transitions | per epic |
+| Preemption | AD-6's two-part challenger gate, victim order, `PREEMPTION_REFUSED`, per-victim cap, same-night re-queue | before the Preemption story merges |
+| Performance | NFR-2, NFR-3, NFR-8, NFR-9 under load, at 1x and 1440x | reported, not gated (F-36) |
 
-**`POST /simulations` returns exactly one of `PASSED` / `FAILED`, and the run-gate set is a closed list.** `FAILED` names each violated invariant individually (F-36) rather than reporting a boolean. The set of checks a run verdict aggregates is: Invariant S-1 (NFR-14 slot release at every simulated minute), Invariant S-2 (no resume from an unverified Checkpoint), FR-26's F-1 through F-26 testable conditions, and the AD-1 through AD-8 rules where they are expressed as testable conditions. **A performance budget is not in this set** — it is the benchmark harness's report. The set is closed so that a run verdict is reproducible, and adding a check to it is a PRD-visible change.
+**`POST /simulations` returns exactly one of `PASSED` / `FAILED`, and the run gate is PRD FR-30(d) verbatim.** The status is `FAILED` if any invariant in PRD §4 (**S-1, S-2, S-3**) or any of **NFR-4, NFR-5, NFR-6, NFR-7, NFR-10, NFR-14, NFR-16** is violated, and the response names **each** violated invariant individually (F-36). Nothing else is in the gate. Specifically:
 
----
+- **NFR-1 and NFR-11 are build-time static checks, not run-gated.** They are asserted by the single-time-call-site scan (AD-1) and the fixture scan (AD-8), both of which fail the build rather than a run.
+- **NFR-2, NFR-3, NFR-8 and NFR-9 are measured by a separate benchmark harness**, not by a run verdict, because a CI run without real-time discipline cannot meaningfully assert wall-clock latency (F-36).
+- **F-ids are test cases, not checks.** The earlier draft listed "F-1 … F-26" and "AD rules where testable" as gate members; an F-id identifies a testable condition that a check may exercise, and an AD rule that is not a PRD invariant is not a run gate. `GET /simulations/{id}` therefore reports PRD invariants only.
+
 
 ## 2. Component topology
 
@@ -248,11 +256,11 @@ Field names are the internal model. `sim_instant` is always a Daemon Timestamp w
 |---|---|---|
 | `REJECTED` | — terminal | Emitted at submission when FR-2 validation fails. Never entered the Pending Set. |
 | `QUEUED_PENDING_WINDOW` | `T-1` admit, `T-2` re-admit, `T-20` re-admit after `EVICTION_FAILED`, `T-4a` / `T-4b` / `T-18` defer, `T-15` expire | AD-1 (queue), AD-2 (commit) |
-| `RUNNING` | `T-6` evict, `T-7` preempt, `T-10` fail, `T-11` / `T-22` / `T-23` process exit, `T-12` / `T-13` checkpoint-path failure, `T-5` complete | AD-4 (slots), AD-6 (preempt), AD-7 (checkpoint) |
+| `RUNNING` | `T-6` evict, `T-7` preempt, `T-10` fail, `T-22` (one automatic retry) / `T-23` process exit, `T-12` / `T-13` checkpoint-path failure, `T-5` complete | AD-4 (slots), AD-6 (preempt), AD-7 (checkpoint). **There is no `T-11`** — deleted in the PRD's own adversarial review; the earlier draft of this row still routed through it. |
 | `CHECKPOINTING` | `T-8` evict complete, `T-9` deadline missed | AD-7; a substate of the Eviction Ramp or of a Preemption |
-| `EVICTED_RESUMABLE` | `T-2` re-admit next window | AD-7 — resumable only from a `VERIFIED` Checkpoint (Invariant S-2) |
+| `EVICTED_RESUMABLE` | `T-2` re-admit next window; `T-14` re-place **the same night** when the job was preempted | AD-7 — resumable only from a `VERIFIED` Checkpoint (Invariant S-2) |
 | `COMPLETED` | — terminal | **`T-5`**: all steps finished before the deadline. Reached from `RUNNING`; slots released atomically per AD-4 and `NIGHT_CLOSE` still applies. |
-| `FAILED` | — terminal | `T-10`, `T-11`, `T-13`, `T-21`, `T-22`, `T-23`, and a `CHECKPOINT_CORRUPT` digest mismatch. Last verified Checkpoint, if any, is retained per FR-22. |
+| `FAILED` | — terminal | `T-10`, `T-13`, `T-21`, `T-23`, a Max Night Span refusal (Invariant S-3), and a `CHECKPOINT_CORRUPT` digest mismatch. `T-22` is the retry and is **not** terminal. Last verified Checkpoint, if any, is retained per FR-22. |
 | `EVICTION_FAILED` | `T-20` re-admit next window | **Non-terminal and recoverable**, which is why it is its own state and not `FAILED`. The Eviction Ramp could not produce a verified Checkpoint; a Cordon Request is issued against the Node and the job is re-admitted to the next Night Window. Checkpoint corruption is **not** a sub-reason here — it is detected only at resume time and routes to `FAILED` (AD-7). |
 | `EXPIRED` | — terminal | **`T-15`**: the Retention Deadline passed without admission. Its Checkpoints become eligible for garbage collection at the 03:00 reaper, and the PRD §6.2 `self:`-alone citation allowance applies to it (F-1, NFR-4). |
 
@@ -356,7 +364,7 @@ Every route below requires a bearer token validated against the M1 identity fixt
 | `GET` | `/jobs/{job_id}` | FR-25 | `STUDENT` (own), `LAB_ADMIN` | state, position-or-placement, the last 10 Decision Records with citations, `next_decision_at`. The 10 is an upper bound and the response is never padded (EXPERIENCE.md) |
 | `GET` | `/jobs?query=` | FR-25, FR-31(b) | viewer-scoped | `STUDENT` search is scoped to its own jobs; `LAB_ADMIN` is fleet-wide |
 | `GET` | `/board` | FR-25 | both | 33 slot rows; every idle slot carries a reason code, never blank |
-| `GET` | `/admission-order` | FR-8, FR-15, FR-25 | `LAB_ADMIN` | every ranked row up to `QUEUE_DEPTH_CAP` = 500, each carrying its decision and citation |
+| `GET` | `/admission-order` | FR-8, FR-15, FR-25 | `LAB_ADMIN` | every ranked row of the **queued subset**, each carrying its decision and citation. The response length is the **true length** and is never padded to 500: `QUEUE_DEPTH_CAP` = 500 bounds *admission* and is checked against **all** non-terminal jobs at `T-1` (AD-1), which is a different set from this list |
 | `GET` | `/nodes/{node_id}` | FR-12, FR-13 | `LAB_ADMIN` | slot occupancy, exclusion reasons, the FR-13 placement candidates |
 | `POST` | `/nodes/{node_id}/cordon/clear` | FR-23, FR-26(c), FR-31 | `LAB_ADMIN` | records `CORDON_CLEARED` with the actor. States explicitly that clearing the node does not gate the job (T-20) |
 | `POST` | `/checkpoints/{id}/quarantine/release` | FR-20(c)(d) | `LAB_ADMIN` | requires a reason code. Issues **no** Cordon Request (FR-20(e)) |
@@ -369,6 +377,7 @@ Every route below requires a bearer token validated against the M1 identity fixt
 | `GET` | `/simulations/{id}` | FR-30(c)(d) | `LAB_ADMIN` | `RUNNING` then exactly one of `PASSED` / `FAILED`; `FAILED` names each violated invariant individually (F-36) |
 | `GET` | `/simulations/{id}/artifacts` | FR-30(b) | `LAB_ADMIN` | manifest, Decision Record log, event log |
 | `GET` | `/openapi.json`, `/docs` | — | — | Swagger; the same payload schemas the console renders |
+| `POST` | `/auth/session` | FR-31 | authenticated | a validated Module 1 fixture bearer token in, an **HttpOnly, SameSite=Strict** session cookie out. The console reads the actor from the session and applies the same single `ROLE_CAPABILITY` table as the API (AD-8), so a bearer token never reaches a page |
 | `GET` | `/health` | NFR-16 | — | process liveness and pacer progress, deliberately not a scheduling decision. **The previous draft cited FR-16 here, which was a fabricated reference: FR-16 is Preemption.** |
 
 ### 4.2 Event contracts
@@ -393,22 +402,22 @@ Every route below requires a bearer token validated against the M1 identity fixt
 sequenceDiagram
     autonumber
     participant P as Pacer
-    participant Q as Event Queue<br/>(sim_instant, seq)
+    participant Q as Event Queue<br/>(sim_instant, seq intra-batch tiebreak)<br/>durable key is decision_id (AD-1)
     participant E as Engine Core (pure)
     participant X as Effect Executor<br/>the only component that performs effects (AD-1)
     participant M as Stubs M1 M2 M3 M4 M5 M8
-    participant D as Emitter
+    participant D as Emitter + Committer<br/>the only writer (AD-2)
     participant L as SQLite Log
     participant S as Snapshot
     participant U as Console / Swagger
 
-    P->>Q: advance sim_instant to 22:00:00 exactly (AD-6)
+    P->>Q: advance sim_instant to 22:00:00 exactly (AD-1)
     Q->>E: dequeue WINDOW_ACTIVATION
     E->>E: drift latch clear? (FR-10b)
     E->>X: effect intent — entitlement M1 · policy + freeze M2 · quota M8
     X->>M: entitlement M1 · policy + freeze M2 · quota M8
     alt any verdict missing, or a freeze is latched
-        E->>D: T-18/FR-8(e) DEFER + block reason, citing the missing authority
+        E->>D: FR-8(e) blocked-activation record, transition: null, block reason<br/>+ T-18 DEFER citing the missing authority;<br/>a missing verdict cites self:DELEGATE-UNAVAILABLE-v1 (E-5)
         D->>L: commit record + lifecycle event
         D->>S: swap snapshot (state + record in one batch, AD-2)
         E->>Q: re-enqueue WINDOW_ACTIVATION at +5 simulated min, until 04:00:00
@@ -427,8 +436,9 @@ sequenceDiagram
             else rank exceeds free Eligible slots
                 E->>D: T-4b DEFER CAPACITY_EXHAUSTED · node-state:M3/... + policy:M2/...
             else
-                E->>X: effect intent — re-evaluate eligibility from the current batch snapshot
-                X->>M: re-evaluate eligibility from the current batch snapshot (FR-12d)
+                E->>X: effect intent — re-consume policy + freeze M2 and re-evaluate<br/>health M3 + reservations M4 from the current batch snapshot (E-11)
+                X->>M: re-consume M2 policy and freeze, then M3/M4 eligibility (FR-12d)
+                Note over E: stop at the first latched freeze; every remaining rank takes<br/>T-18 DEFER citing policy:M2 -- never a stale verdict (E-11)
                 E->>E: T-3 select Node (FR-13) + atomic slot set (AD-4)
                 E->>D: T-3 ADMIT · granted-priority source + node-state:M3/... (+ reservation:M4/... when consulted)
                 D->>L: commit record + lifecycle event
@@ -451,14 +461,15 @@ sequenceDiagram
     participant X as Effect Executor<br/>the only component that performs effects (AD-1)
     participant K as Checkpoint Store
     participant M as Stub M3
-    participant D as Emitter
+    participant D as Emitter + Committer<br/>the only writer (AD-2)
     participant L as SQLite Log
     participant S as Snapshot
     participant O as Notification Outbox
 
     P->>Q: advance sim_instant to 05:45:00
     Q->>E: dequeue EVICTION_RAMP_START
-    loop every RUNNING job, in one batch (FR-19a)
+    loop every RUNNING job, in ONE transaction, never split (FR-19a, AD-2)
+    Note over E,D: every T-6 carries sim_instant = 05:45:00 -- SIGTERM is the<br/>ramp's instant, not the instant the job was reached (E-3)
         E->>D: T-6 EVICT · self:EVICTION-RAMP-v1 + node-state:M3/... (>=1 non-self:, NFR-4)
         D->>L: commit record
         E->>Q: enqueue CHECKPOINTING
@@ -467,11 +478,12 @@ sequenceDiagram
     Q->>E: dequeue CHECKPOINTING
     E->>X: effect intent — write temp, fdatasync
     X->>K: write temp, fdatasync(file), atomic rename, fsync(parent dir), sha256 (FR-18a, AD-7)
-    alt all five steps complete and verified before 05:53:00 (F-7 reserve is usable)
-        K-->>E: digest + bytes + step + sim_timestamp
+    alt all five steps complete by the sim_instant of the fifth step, and that<br/>instant is at or before 05:53:00 -- the commit may follow the deadline (E-2)
+        K-->>E: digest + bytes + step + sim_instant of the fifth step
+        E->>E: release the job's slot set FIRST, immediately (FR-19d)
         E->>D: T-8 EVICT, supersedes the T-6 record
         D->>L: commit record
-        E->>E: release the job's slot set, immediately
+        D->>S: swap snapshot
         E->>X: effect intent — notify submitter — last verified step, next eligible resume
         X->>O: notify submitter — last verified step, next eligible resume (FR-27)
     else the write errors (T-10, the mandatory edge case)
@@ -481,18 +493,22 @@ sequenceDiagram
         X->>M: Cordon Request naming ws-gpu-19 + EVICTION_CHECKPOINT_WRITE_FAILED (FR-23c)
         E->>D: T-10 FAIL CHECKPOINT_WRITE_FAILED · node-state:M3/... + self:EVICTION-RAMP-v1
         D->>L: commit record
-        E->>D: FR-23(c) CORDON record, transition null
+        E->>D: FR-23(c) CORDON record, transition: null
         D->>L: commit record
+        Note over E: a write failure with cause STORE_FULL applies T-10 WITHOUT<br/>a Cordon Request -- a full store is not a faulty Node (FR-23i, AD-7)
         E->>X: effect intent — exactly two notifications — submitter and lab admin
         X->>O: exactly two notifications — submitter and lab admin (FR-23f)
-        Note over E: last verified Checkpoint retained, never deleted (FR-23e, S-2);<br/>no retry on the same Node (FR-23b); the Node stays not-Eligible<br/>even if M3 rejects the request (FR-23h, A-15)
+        Note over E: last verified Checkpoint retained, never deleted (FR-23e, S-2);<br/>no retry on the same Node (FR-23b); the Node stays not-Eligible<br/>even if M3 rejects the request (FR-23h, A-15); if this Checkpoint was<br/>written for a PREEMPTION, the challenger's placement is CANCELLED and the<br/>challenger returns to the Admission Order (E-13)
     end
     P->>Q: advance sim_instant to 05:53:00
     Q->>E: dequeue SIGKILL
+    Note over E,Q: at an identical instant T-8 ranks AHEAD of SIGKILL, so a<br/>Checkpoint durable at 05:53:00.000 is committed, not destroyed (E-2)
     E->>E: kill every job still in CHECKPOINTING, regardless of state (FR-19c)
     alt no verified Checkpoint by 05:53:00
+        E->>E: release the job's slot set FIRST, before the failure record (FR-19d)
         E->>D: T-9 FAIL CHECKPOINT_DEADLINE_MISSED · self:EVICTION-RAMP-v1
         D->>L: commit record
+        D->>S: swap snapshot
         Note over E: last verified Checkpoint retained per S-2
     end
     E->>X: effect intent — assert allocations_held == 0 at 06:00:00
@@ -509,20 +525,22 @@ sequenceDiagram
     participant E as Engine Core
     participant X as Effect Executor<br/>the only component that performs effects (AD-1)
     participant M as Stubs M1-M5 M8
-    participant D as Emitter
+    participant D as Emitter + Committer<br/>the only writer (AD-2)
 
     OS--xE: abrupt kill at an arbitrary instant
-    Note over L: last committed (sim_instant, seq) is durable —<br/>one transaction per commit (AD-2), so 0 committed transitions are lost
+    Note over L: last committed decision_id is durable — one transaction<br/>per commit (AD-2), so 0 committed transitions are lost.
+    seq is an intra-batch tiebreak that resets each batch and is never<br/>persisted globally, so it cannot be a restore watermark (F-2)
     OS->>E: restart
-    E->>X: effect intent — read the last committed seq, then read log rows with seq <= 
-    X->>L: read the last committed seq, then read log rows with seq <= it
+    E->>X: effect intent — read last_committed_decision_id, then every log row<br/>with decision_id <= it
+    X->>L: read last_committed_decision_id, then every log row with decision_id <= it
     E->>E: fold the log prefix into state — apply NO transition (FR-9a, T-18, F-12)
-    E->>E: open a new fold epoch at last_committed + 1
+    E->>E: rebuild the queue from the AD-1 inventory (AD-5)
     E->>D: T-18 DEFER DAEMON_RESTORE · self:RECONCILIATION-v1
     D->>L: commit record
     Note over E: reconciliation is a SEPARATE, recorded step (FR-9b, F-12)
-    E->>E: did a 22:00:00 instant elapse while the daemon was down?
-    alt elapsed and the Night Window is still open
+    E->>E: enumerate EVERY scheduled event whose sim_instant elapsed while the<br/>daemon was down -- not only the 22:00:00 window (E-6)
+    E->>E: an elapsed CHECKPOINT_DEADLINE (05:53:00) releases its slot and<br/>records that release BEFORE the reconciliation record; an elapsed<br/>NIGHT_CLOSE (06:00:00) has its T-19 accounting recorded first (E-6)
+    alt an elapsed 22:00:00 and the Night Window is still open
         E->>X: effect intent — re-consume every delegated verdict
         X->>M: re-consume every delegated verdict (FR-6a)
         E->>D: FR-9(c) ADMIT RECONCILIATION_ACTIVATION · self:RECONCILIATION-v1
@@ -550,15 +568,21 @@ sequenceDiagram
 
   **One enqueue channel.** API handlers, console routes and the Pacer may only enqueue an intent and read the current snapshot; they may not mutate state. Operator actions — cordon clearance, priority grant, quarantine release, rate change, jump-to-instant — are *intents on this same channel*, never direct writes. This is what makes an operator action replayable and auditable like any other transition.
 
-  **The queue is a closed inventory of scheduled event kinds.** Nothing is scheduled that is not one of: `WINDOW_ACTIVATION` (22:00:00), `NIGHT_CLOSE` (06:00:00), `EVICTION_RAMP` (05:45:00), `CHECKPOINT_DEADLINE` (05:53:00), `PREEMPTION_WINDOW_CLOSE`, `CHECKPOINT_REAP` (03:00:00), and a delegate-sourced or operator-sourced intent. The inventory is a closed list so that restore can rebuild the queue exhaustively (AD-5) and so that a future "just schedule it" cannot slip in un-audited.
+  **The scheduled-event inventory is enumerated, not described.** Restore (AD-5) rebuilds the queue exhaustively from it, so a kind missing here is a kind that cannot be restored. The complete list, each at the single instant AD-1 gives it: `WINDOW_ACTIVATION` (22:00:00), `NIGHT_CLOSE` (06:00:00), `EVICTION_RAMP` (05:45:00), `CHECKPOINT_DEADLINE` (05:53:00), `CHECKPOINT_REAP` (03:00:00), plus per-job `PERIODIC_CHECKPOINT` at `checkpoint_interval_minutes` offsets, `CHECKPOINT_PRE_VERIFICATION` (21:30:00), `CHECKPOINT_VERIFICATION_DEADLINE` (21:59:00), `RETENTION_DEADLINE`, the `T-7` Preemption attempt, and the `T-10` / `T-13` failure paths. A delegate-sourced or operator-sourced intent is also schedulable, and is *not* in this list because it carries no `sim_instant` of its own — it takes the instant the enqueuing component stamps. **There is no scheduled preemption-window-close event.** FR-16(e)'s once-per-victim cap is enforced against the victim's `preempted_in_window` flag at the moment of the `T-7` attempt, not by a window-closing event; an earlier draft invented `PREEMPTION_WINDOW_CLOSE`, which gave a second, unaccounted way for a preemption to stop being allowed.
 
-  **`seq` is always defined.** The queue is keyed `(sim_instant, seq)`. For admission events, `seq` is the Admission Order rank. For every other event class, `seq` is a per-batch monotonic counter. An event with no `seq` is a build failure.
+  **`seq` is an intra-batch tiebreak and nothing more; `decision_id` is the durable key.** The queue is ordered by `(sim_instant, seq)`, but `seq` is **not** Admission Order rank — tying an ordering key to a business ranking is what made the log non-monotonic. `seq` is a per-drain-batch monotonic counter that breaks ties between events sharing one `sim_instant`; it is scoped to the batch, resets each batch, and is never persisted as a global sequence. Every Decision Record is keyed by `decision_id`, and the log and the restore watermark are ordered and compared by `decision_id`. Admission Order rank is a *derived* field, computed per ARCHITECTURE §6.1's derived-field rule and never stored.
 
   **Time and rate are separate.** The engine sets `sim_instant = next_event.sim_instant` exactly — never a wall-clock delta, never a frame boundary, never rounded to a rate-dependent quantum. The Fast-Forward rate is a real-time integer in {1, 60, 360, 1440} or 0, consumed **only** by the Pacer to decide when to invoke the next drain; changing it mutates nothing but that scalar. A rate of 0 pauses the Pacer and leaves the queue untouched. FR-19's SIGTERM and SIGKILL are `sim_instant` values 05:45:00 and 05:53:00, so NFR-5's ± 2 simulated-second tolerance holds identically at every rate. FR-28(c)'s jump-to-instant drains every transition at or before the target before rendering.
 
+  **No placement may start once the Eviction Ramp has begun.** Every placement — `T-3` admission, `T-12` resume, `T-14` same-night re-placement — is guarded by `sim_instant < 05:45:00`, and a preemption attempted at or after 05:45:00 is refused under AD-6. Without this guard a job placed at 05:50 would be `RUNNING` at 05:53 with no `T-6` scheduled, would hold a slot past 06:00:00, and would breach S-1 and NFR-14 simultaneously. The guard is a precondition on the intent, evaluated in the fold, not a rate limit.
+
   **Night-close accounting has a named owner and a named instant.** `NIGHT_CLOSE` at 06:00:00 is the sole writer of the ageing counters. On that event: if the job's admitted minutes for the night are 0, `consecutive_nights_missed` increments; if they are greater than 0, it resets to 0. `admitted_nights` increments whenever the job was admitted for at least one minute. This realises `T-19` and is the only place any of the three counters changes.
 
-  **The `PROCESS_EXIT` retry count is owned by `WINDOW_ACTIVATION`, and it resets only on an admission.** `T-11` and `T-23` both consume a retry budget when a job's process exits or is OOM-killed during a night. The count increments on each such event and is **not** reset by `NIGHT_CLOSE`, by a restore, or by a `DEFER` — otherwise a job that crashes every night would never exhaust its budget. It resets to 0 only when the job is placed by `T-3` and actually begins executing. The count therefore means "consecutive nights in which this job was placed and then lost its process", which is the quantity the retry cap is about. Exhausting the budget routes to `FAILED` through the `T-11` / `T-23` rows of PRD §6.4.
+  **The `PROCESS_EXIT` retry budget is one automatic retry per night, and only `NIGHT_CLOSE` resets it.** `T-22` is the retry: it is available only while the budget is unspent for the current night. A second `PROCESS_EXIT` in the same night exhausts the budget and routes to `T-23`, then `FAILED`. The count resets **only** at `NIGHT_CLOSE` — not on a re-placement, not on a restore, not on a `DEFER` — so a job whose process keeps crashing cannot loop all night. **(There is no `T-11`; it was deleted in the PRD's own adversarial review, and the earlier draft of this rule still routed through it.)** The budget deliberately is *not* reset by an admission, because "consecutive nights" was the wrong quantity: a job that crashes on admission, retries, and crashes again within one night must exhaust the budget in that night.
+
+  **The 500-job cap counts all non-terminal jobs and is checked at exactly one transition.** `QUEUE_DEPTH_CAP` = 500 is evaluated at `T-1` admission, and counts every non-terminal job — `QUEUED_PENDING_WINDOW`, `RUNNING`, `CHECKPOINTING`, `EVICTED_RESUMABLE` and `EVICTION_FAILED` — not only the queued subset. Counting only queued jobs let a fleet of 500 running jobs admit 500 more. Re-entries (`T-12`, `T-14`, `T-20`) are never refused against the cap: refusing a re-entry would strand a job that already holds admitted work, and since the count already includes every state a re-entry can produce, a re-entry cannot push the set above the cap. `GET /admission-order` returns the true length of the queued subset and never pads to 500.
+
+  **Every modelled duration is charged in simulated time, and the real-time cost of hashing is amortised by the Pacer.** The five Checkpoint steps of AD-7, the drain itself, and every other modelled duration are all denominated in the simulation's own clock. The Checkpoint Budget's 300 s is therefore always exactly 300 simulated seconds at every Fast-Forward rate, and the 21:59 verification deadline is never evaluated against real time. Hashing a large Checkpoint costs real milliseconds that no simulated clock can compress; that cost is the Pacer's to absorb between drains, and it is explicitly **not** measured against the 21:59 deadline, which is a simulated instant.
 
   **Derived means derived.** A closed set of fields is recomputed from state on every Admission Order and is never persisted: `effective_priority`, `aging_boost`, and every rank used for ordering. Storing a derived field is a build failure, because two copies of one truth is how the console and the engine drift apart.
 - **Trade-off:** a CPU-bound drain — 200 jobs over 24 simulated hours at 1440× inside FR-28's 75 s — occupies the loop, so the writer yields every *K* drained events and the console's per-slot 250 ms dwell queue (EXPERIENCE.md) absorbs the visual lag; a 1440× drain also makes the process look idle to a naive liveness probe, so `/health` reports pacer progress. Routing operator actions through the queue adds a hop of latency to an admin click. The alternative, a second process, is rejected at NFR-10.
@@ -568,11 +592,13 @@ sequenceDiagram
 - **Status:** `[ADOPTED]`
 - **Binds:** FR-24(d), FR-24(e), FR-24(f), FR-25(b), NFR-2, NFR-3, NFR-4, NFR-7, NFR-9, NFR-10, PRD §6.1, PRD §6.4, Invariant S-2, F-23
 - **Prevents:** a torn record/transition pair when the process dies between the two writes — the source of NFR-10's "0 duplicate transitions" half; a state change that reaches the console with no Decision Record behind it, which is the exact 40 ms window EXPERIENCE.md names where a `running` tile has no citation on screen; per-transition database round-trips pushing NFR-2's 200 ms p95 over 500 pending jobs; NFR-9's 500 ms real-time visibility being missed at 1440×.
-- **Rule:** The engine core is a pure function `apply(state, intent, sim_instant) → (state', [intent])`. It performs no I/O, reads no clock, and draws no randomness outside a seeded RNG passed in by the caller. A commit is exactly one SQLite transaction, owned by the Committer, that appends the Decision Record rows and the LifecycleEvent rows ordered by `(sim_instant, seq, decision_id)`, on a database in WAL mode with `synchronous=FULL`; the new in-memory state is installed only after that transaction's `COMMIT` returns. The snapshot pointer is then swapped once, atomically, carrying the folded state **and** the records committed in that batch together — a surface never receives a state change without its record. The PRD §6.4 transition → (decision, reason, citations) table is read from SQLite as data, so state is not queryable in SQL without a fold and every read path is served from the snapshot.
+- **Rule:** The engine core is a pure function `apply(state, intent, sim_instant) → (state', [intent])`. It performs no I/O, reads no clock, and draws no randomness outside a seeded RNG passed in by the caller. A commit is exactly one SQLite transaction, owned by the Committer, that appends the Decision Record rows and the LifecycleEvent rows ordered by `(sim_instant, decision_id)`, on a database in WAL mode with `synchronous=FULL`; the new in-memory state is installed only after that transaction's `COMMIT` returns. The snapshot pointer is then swapped once, atomically, carrying the folded state **and** the records committed in that batch together — a surface never receives a state change without its record. The PRD §6.4 transition → (decision, reason, citations) map is read from the versioned read-only file described in AD-3, so state is not queryable in SQL without a fold and every read path is served from the snapshot.
 
-  **The batch is the unit of atomicity, and its size is bounded by the transaction, not by the number of records.** A single Window Activation drains all its jobs' transitions and commits them in **one** transaction. An activation producing on the order of 500 `DEFER` records therefore costs one fsync, not 500 — which is how NFR-2's 200 ms p95 over 500 pending jobs is met. If a drain cannot fit in one transaction it is split at a batch boundary, and each batch carries its own records; a split is visible as two snapshot swaps, never as a state change without a record.
+  **The batch is the unit of atomicity, and its size is bounded by the transaction, not by the number of records.** A single Window Activation drains all its jobs' transitions and commits them in **one** transaction. An activation producing on the order of 500 `DEFER` records therefore costs one fsync, not 500 — which is how NFR-2's 200 ms p95 over 500 pending jobs is met. If a drain cannot fit in one transaction it is split **only at a drained event boundary** — never mid-transition and never mid-fifo — and each batch carries its own records; a split is visible as two snapshot swaps, never as a state change without a record.
 
-  **A Checkpoint's metadata record commits in the same transaction as the transition it enables.** A `VERIFIED` record and the `RESUMED_FROM` transition that consumes it are one transaction. Otherwise a crash between them would leave a verified Checkpoint with no resume, or a resume whose Checkpoint was never recorded as verified.
+  **The Eviction Ramp is one drain, and its `T-6` stamps are never split.** Every `T-6` in a ramp carries `sim_instant = 05:45:00` — SIGTERM is the ramp's own instant, not the instant a job happened to be reached — and a job whose `T-6` has not committed by 05:53:00 takes the FR-19(c) `SIGKILL` path. Splitting the ramp across transactions therefore is not a performance choice but a correctness bug: the second half of a split ramp would emit `T-6` records stamped after 05:45:00, which both misreports the SIGTERM and lets a job slip past the 05:53 guard.
+
+  **A Checkpoint's metadata record commits in the same transaction as the transition it enables.** The `T-8` record is one transaction with the `EVICTED_RESUMABLE` transition; the `T-12` record is one transaction with the `RESUME`. Otherwise a crash between them would leave a durable Checkpoint with no record, or a resume whose Checkpoint was never recorded as verified.
 - **Trade-off:** raw state is not directly queryable — inspecting it means folding the log — and the fold must stay deterministic for that to be usable; a large batch also holds a longer write lock on the single SQLite file. In exchange FR-24(e) is structural rather than a discipline, and NFR-2 and NFR-9 are met by construction.
 
 #### AD-3 — Fail-closed at the emitter: a refused record means the transition never happens
@@ -595,7 +621,13 @@ sequenceDiagram
 
   **An administrator's priority grant has no registered citation authority, and that is a PRD gap, not a design choice.** PRD §6.4's `T-3` row contemplates the administrator's grant record as a ranking source, but PRD §6.2 registers no authority string for it. This invariant therefore **fails closed** on a grant-sourced `T-3`: the intent is refused, no transition is applied, and an `EMITTER_REJECTED` integrity event is appended. That is the correct outcome, and it is a visible stop rather than a silent under-citation. Carried as Open Question 6.
 
-  **Three PRD §6.4 rows are missing and fail closed for the same reason.** `FR-10` drift, `FR-31(e)` role mismatch and `FR-29(a)` OOM advisory have no row in PRD §6.4. They must not be invented here, so a record for any of them is refused. Carried as Open Question 7.
+  **The map is versioned, read-only data, not rows in the working database.** PRD §6.4 ships as a file inside the image, **outside** the SQLite file and outside the fold, so the emitter cannot write it and a drift in the decision map cannot masquerade as scheduler state. The file carries a version and a checksum; start-up fails on a mismatch, converting a silent citation drift into a start-up error. The earlier draft stored the map as mutable rows in the same SQLite file with no version, so nothing detected a drift.
+
+  **A refused authorisation is a `LifecycleEvent`, never a Decision Record.** A caller who does not own a resource, or who owns it and is refused anyway, gets a `404` (the amended FR-31(e)). That refusal is recorded as a `LifecycleEvent` carrying actor, route and time. The earlier draft demanded a Decision Record, but PRD §6.4 has no row for a role mismatch, so AD-3 would have had to accept an unmapped record to satisfy it — the two rules were in direct contradiction.
+
+  **A delegated verdict that never arrives produces a cited refusal, not silence.** If Modules 1, 2, 5 or 8 return no verdict, the submission is refused as FR-6(b) requires, citing **`self:DELEGATE-UNAVAILABLE-v1`** — a `self:` identifier that the PRD amendment now registers precisely so this case is auditable. Store pressure (`STORE_FULL`) and a delegate's unavailability are the only two conditions that authorise a record with no delegated authority behind it, and both exist so an expected failure produces a record rather than a hang.
+
+  **Two PRD §6.4 rows are still missing and fail closed for the same reason.** `FR-10` drift and `FR-29(a)` OOM advisory have no row in PRD §6.4. They must not be invented here, so a record for any of them is refused. `FR-31(e)` is no longer one of them: the amended rule is a `404` with a `LifecycleEvent`, which needs no §6.4 row. Carried as Open Question 7.
 
   On rejection the intent is discarded, no transition is applied, the job remains in its prior state, an `EMITTER_REJECTED` integrity event is appended to the log, and the enclosing run's verdict is `PASSED`.
 - **Trade-off:** a gap in the PRD §6.4 table is a hard runtime stop on that transition rather than a silently under-cited record — the correct failure per F-24, but it means the map must be complete before any story that emits a new transition lands, and the three known PRD gaps are visible stoppages until the PRD is amended.
@@ -607,24 +639,29 @@ sequenceDiagram
 - **Prevents:** the F-42 ambiguity of 32 Nodes against 33 GPUs; a 2-GPU job releasing one slot of `server-gpu-01` and stranding the other past 06:00:00, which is an NFR-14 breach; a job admitted at 2 GPUs onto the 24 GB class, or pinned to a `ws-gpu-NN`, which is FR-2(k)'s unplaceable job; the console roll-up counting one 2-GPU job as one slot.
 - **Rule:** The fleet is 32 `Node` rows and 33 `GpuSlot` rows — `ws-gpu-01`…`ws-gpu-31` at one 24 GB slot each and `server-gpu-01` at two 48 GB slots. An `Allocation` is a non-empty subset of the slots of exactly one Node, of cardinality 1, or of cardinality 2 which must be both slots of `server-gpu-01`; `Allocation.release()` is all-or-nothing. `allocations_held` is the count of `GpuSlot` rows belonging to an active allocation, and NFR-14 asserts it is 0 at every simulated minute in 06:00:00–22:00:00. Health, cordon and reservation are Node-level facts applied to every slot of that Node, while job occupancy is per slot. A Job Spec with `gpu_slots_requested = 2` is refused at submission unless `required_vram_gb = 48`.
 
-  **Node selection is a total order, and the order is the only thing that decides `T-3`.** `FR-13` requires a deterministic choice and the previous draft of this document left the rule implicit, which is how two implementations pick different Nodes for the same input. The Eligible Node set is computed per `T-4b` attempt and each member carries the single exclusion reason that removed the Nodes ahead of it. From that set, the selected Node is the first in ascending order of:
+  **Node selection is a total order, and it is the only thing that decides `T-3`.** `FR-13` requires a deterministic choice, and the earlier draft of this document ranked Nodes by `node_id` and then by free-slot count — an order that appears in no PRD clause and that filled low-numbered Nodes first all night, leaving `server-gpu-01` unbalanced by construction. The Eligible Node set is computed per `T-4b` attempt, and the selected Node is the first in ascending order of exactly three keys:
 
-  1. `node_id` compared as a fixed-width string, so `ws-gpu-02` precedes `ws-gpu-10` and the order never depends on collation or locale;
-  2. then, for a 2-GPU job only, the count of free slots — but since a 2-GPU job is eligible only for `server-gpu-01`, this tiebreak is currently unreachable and exists so that the order stays total if the fleet changes.
+  1. **the previously assigned Node, if it is still Eligible** — affinity first, so a job that survived a ramp or a re-queue tends to return to the hardware its Checkpoints describe;
+  2. **then the lowest `allocations_held`** — the count of active allocations on that Node, which balances the fleet by *allocation* rather than by slot or by VRAM;
+  3. **then `node_id` compared as a fixed-width string**, so `ws-gpu-02` precedes `ws-gpu-10` and the order never depends on collation or locale. This is the only tiebreak, and it is what makes the order total.
+
+  **Eligibility is an allocation-level predicate, not a Node-level one.** A Node is *Eligible for a job* when the job's GPU class and reservation are satisfied **and** enough slots are free to satisfy the job's **whole** request — two slots for a two-GPU job, one for a one-GPU job. A two-GPU job facing a Node with exactly one free slot is `T-4b CAPACITY_EXHAUSTED` for that Node: not Eligible-and-then-rejected at placement, and not evidence of an empty eligible set. The earlier draft marked such a Node "ineligible" and then had to explain why a Node with *some* free capacity was appearing in the exclusion list; eligibility is now the set of Nodes that can actually host the allocation, and no new eligibility vocabulary is introduced to say so.
+
+  **A FR-13(c) candidate is the allocation, and the Decision Record says so.** The `inputs` payload of a `T-3` record names the ranked FR-13(c) candidates considered and which of the three keys the winner won on, so a reader can reconstruct the placement from the record alone.
 
   **No other signal participates.** Not free VRAM, not utilisation, not a least-recently-used heuristic, not wall-clock, not operator input. A Node excluded ahead of the winner contributes its `PRIOR_NODE_INELIGIBLE` note to the `T-3` record's `inputs` payload, so the console can explain the choice without the choice depending on it. Because the order is total and depends only on state the fold already holds, the same Admission Order always yields the same placement, which is what makes F-26's golden fixtures reproducible.
-- **Trade-off:** a 2-GPU job cannot be placed when only one slot of `server-gpu-01` is free, leaving a slot idle that a 1-GPU job could have used; and a pure `node_id` order fills low-numbered Nodes first rather than balancing the fleet, so utilisation is uneven across the night. Splitting the pair is the ambiguity F-42 rejected, and load-balancing is a heuristic that would break NFR-7, so both are accepted costs of determinism.
+- **Trade-off:** a 2-GPU job cannot be placed when only one slot of `server-gpu-01` is free, leaving a slot idle that a 1-GPU job could have used — splitting the pair is the ambiguity F-42 rejected. The affinity key means a job can be returned to a Node that is fuller than another eligible one, which is a real cost; it is paid because affinity is what makes a resumed Checkpoint's device assumptions true. Allocation-count balancing is a heuristic evaluated *after* affinity, and NFR-7 is asserted on `allocations_held`, never on a predicted placement, so it is not what makes the order deterministic.
 
 #### AD-5 — Restore is a fold; reconciliation is a separate recorded step; nothing replays
 
 - **Status:** `[ADOPTED]`
 - **Binds:** FR-5, FR-9(a)–(e), FR-14(d), T-18, F-12, F-13, NFR-7, NFR-10, PRD §6.4
 - **Prevents:** a transition executing twice after a crash, which is NFR-10's "0 duplicate transitions" half; a restored job silently counting an extra Consecutive Nights Missed and aging incorrectly; a 22:00:00 window that elapsed while the daemon was down being both silently skipped and silently replayed; the T-18 "unchanged" guard contradicting FR-9.
-- **Rule:** On start the daemon reads the last committed `seq`, then folds exactly the log rows with `seq ≤ last_committed` into memory, applying no transition; it then opens a new fold epoch at `last_committed + 1`. The fold is a pure function of the log prefix, so the restored state vector is byte-identical to the pre-crash one.
+- **Rule:** On start the daemon reads the last committed `decision_id`, then folds exactly the log rows with `decision_id ≤ last_committed_decision_id` into memory, applying no transition. The fold is a pure function of the log prefix, so the restored state vector is byte-identical to the pre-crash one. The watermark is a `decision_id` and **not** the `seq` of AD-1: `seq` is a per-batch tiebreak that resets every batch, so folding on `seq` truncated the log at a batch boundary whose meaning depended on how the crash happened to fall.
 
-  **Restore rebuilds the queue, not just the state.** A restored daemon with an empty queue would silently drop every future `WINDOW_ACTIVATION`, `NIGHT_CLOSE`, `CHECKPOINT_REAP` and eviction-ramp instant — the same defect as the Fast-Forward drop AD-1 prevents. Restore therefore re-derives the queue from the closed event inventory of AD-1: for each non-terminal job the daemon recomputes its outstanding timed transitions from the restored state — the next `CHECKPOINT_DEADLINE` from the current step, `PREEMPTION_WINDOW_CLOSE`, the job's `WINDOW_ACTIVATION` — and re-inserts each under the same `(sim_instant, seq)` discipline. **Rebuild is idempotent and total:** running it twice yields the same queue, and every non-terminal job has at least one queued transition or a recorded reason why not.
+  **Restore rebuilds the queue, not just the state.** A restored daemon with an empty queue would silently drop every future `WINDOW_ACTIVATION`, `NIGHT_CLOSE`, `CHECKPOINT_REAP` and eviction-ramp instant — the same defect as the Fast-Forward drop AD-1 prevents. Restore therefore re-derives the queue from exactly the enumerated inventory of AD-1 — which is why that inventory is enumerated rather than described. Per job, the outstanding timed transitions are recomputed from the restored state: the next `PERIODIC_CHECKPOINT` from `checkpoint_interval_minutes`; the 21:30:00 `CHECKPOINT_PRE_VERIFICATION` and 21:59:00 `CHECKPOINT_VERIFICATION_DEADLINE` for any job holding a Checkpoint to verify or waiting on one; the job's `RETENTION_DEADLINE` if it is not yet `EXPIRED`; the 05:45:00 `EVICTION_RAMP` and 05:53:00 `CHECKPOINT_DEADLINE` for anything then `RUNNING` or `CHECKPOINTING`; and the 22:00:00 `WINDOW_ACTIVATION`. **Rebuild is idempotent and total:** running it twice yields the same queue, and every non-terminal job has at least one queued transition or a **named reason code** for having none — "a recorded reason why not" was unfalsifiable, because a record that never appears is indistinguishable from a record that was forgotten.
 
-  Reconciliation runs afterwards as a distinct step that computes whether a 22:00:00 instant elapsed while the daemon was down; an activation it performs carries a Decision Record with `reason` `RECONCILIATION_ACTIVATION` citing `self:RECONCILIATION-v1`, and a closed window carries `reason` `MISSED_WINDOW` with the same citation. The restore itself emits one T-18 record with `decision` `DEFER` and `reason` `DAEMON_RESTORE`, because restoration makes no new decision. A snapshot is written at each Night Window boundary so cold start folds from the last snapshot rather than the whole log.
+  Reconciliation runs afterwards as a distinct step that **enumerates every scheduled event whose `sim_instant` elapsed while the daemon was down**, not only the 22:00:00 window. An elapsed `CHECKPOINT_DEADLINE` at 05:53:00 releases the slot it held and records that release **before** the reconciliation record is written, so the audit trail shows the release preceding the reconciliation rather than three minutes of unaccounted occupancy. An elapsed `NIGHT_CLOSE` at 06:00:00 has its ageing-counters accounting recorded through `T-19` before the reconciliation record, for the same reason. An activation it performs carries a Decision Record with `reason` `RECONCILIATION_ACTIVATION` citing `self:RECONCILIATION-v1`, and a closed window carries `reason` `MISSED_WINDOW` with the same citation. The restore itself emits one T-18 record with `decision` `DEFER` and `reason` `DAEMON_RESTORE`, because restoration makes no new decision. A snapshot is written at each Night Window boundary so cold start folds from the last snapshot rather than the whole log.
 - **Trade-off:** the snapshot format is a new artifact that must remain fold-compatible with the log, and a fold bug corrupts both the restore path and the read path at once — caught by FR-26's testable condition, which reconstructs the identical state vector by replaying the log. Queue rebuild adds a second derivation to keep correct alongside the first.
 
 #### AD-6 — Preemption authority is granted-tier only, the victim is chosen deterministically, and a refusal is a record
@@ -634,15 +671,24 @@ sequenceDiagram
 - **Prevents:** the FR-16 hole in the previous draft of this document, where preemption was required by a mandated Annex scenario but had no component, no transition, no reason code and no invariant; a compute-based, wall-clock or human-arbitrary victim choice that would break NFR-7 and FR-11(a); a preemption justified solely by a `self:` citation, which PRD §6.2 forbids; a victim resumed from a Checkpoint that was never verified; a second preemption of the same job in the same Night Window, which FR-16(e) caps at once; a preempted job's slots left allocated past 06:00:00, an NFR-14 breach.
 - **Rule:** Preemption is not a scheduling optimisation in v1. It happens only when the Day Scheduler cannot place the day's work within the Night Window, and only for the `Preemption Margin = 20` slots that must be free before 06:00:00.
 
-  **The authority is a comparison, and only one side of it may authorize.** A job is a preemption candidate only if its grant tier is the granted tier. A job occupying a slot whose grant tier is *not* the granted tier is **never** a victim, whatever the arithmetic says. This is a fail-closed comparison against the M1 fixture, not a heuristic, and it means a missing tier resolves to "not a victim" rather than to "eligible".
+  **The authority is a two-part comparison, and both parts must hold.** FR-16(b) gates preemption on the *challenger*, and the earlier draft of this rule checked only the victim's tier, which left the actual gate unstated. A job is a preemption candidate only when **both** of these hold:
 
-  **The victim is chosen by a total, deterministic order — never by wall-clock and never by a human at runtime.** Candidates are ordered by: (1) the lowest `AGING_RATE`-weighted age, so older work is preempted first and the ageing rule and the preemption rule cannot contradict each other; (2) then lowest `effective_priority` as derived by AD-1; (3) then lowest `job_id` as a stable tiebreak. Nothing else participates. The `Preemption Margin` gate is checked before any victim is selected, so a Margin of 0 performs no selection at all.
+  1. **the challenger's** granted tier is `THESIS` or `URGENT`; and
+  2. the challenger's **effective** priority is at least the victim's effective priority **plus the Preemption Margin** — a **priority delta of 20**, not 20 slots.
 
-  **A refusal is a first-class outcome, recorded as a transition.** Where the margin gate, the granted-tier authority or the five-step Checkpoint protocol leaves no admissible victim, the attempt emits a `PREEMPTION_REFUSED` record citing the failed gate, and the job stays placed. PRD §6.4's non-transition table lists `FR-16(c) PREEMPTION_REFUSED` precisely because refusal is expected traffic, not an error path.
+  A job occupying a slot whose grant tier is *not* the granted tier is **never** a victim, whatever the arithmetic says. This is a fail-closed comparison against the M1 fixture, not a heuristic, and it means a missing tier resolves to "not a victim" rather than to "eligible". **Ageing never authorises a preemption.** The ageing term of FR-14 is folded into `effective_priority` by AD-1's derived-field rule and therefore reaches the comparison only as part of that single number; the earlier draft of this rule weighted age separately in the victim order, which created a second path by which a long-waiting job could displace a higher-priority one without ever satisfying the margin.
 
-  **Once per Night Window.** `PREEMPTION_WINDOW_CLOSE` is a scheduled event in AD-1's inventory; once it is processed, no further preemption is attempted for that window, and a second attempt in the same window is refused and recorded. FR-16(e) is therefore structural rather than a flag check.
+  **The victim is chosen by a total, deterministic order — never by wall-clock and never by a human at runtime.** Candidates satisfying the two-part gate above are ordered by: (1) lowest `effective_priority` as derived by AD-1, which is where FR-14's ageing term already lives; (2) then oldest `submitted_at`; (3) then lowest `job_id` as a stable tiebreak. Nothing else participates. The `Preemption Margin` gate is checked before any victim is selected, so a Margin of 0 performs no selection at all.
 
-  **The victim's Checkpoint is a precondition, and the resume follows AD-7 in full.** A victim is preempted only if it has a Checkpoint that is `VERIFIED`, or that verifies during the 21:30:00 pre-verification phase and completes by 21:59:00. The victim is evicted to `EVICTED_RESUMABLE`, its slots are released atomically per AD-4, and it re-enters tomorrow's Admission Order. A digest mismatch routes it to `FAILED` with `CHECKPOINT_CORRUPT` and issues **no** Cordon Request, per AD-7. `T-22` and `T-23` — a preemption that races a process exit or an OOM — resolve through AD-5's fold rather than by special-casing, so the outcome after restore is whatever the log says it was.
+  **A refusal is a first-class outcome, recorded as a transition.** Where either half of the two-part gate, or the five-step Checkpoint protocol, leaves no admissible victim, the attempt emits a `PREEMPTION_REFUSED` record **naming which gate failed** — `CHALLENGER_TIER_INSUFFICIENT`, `PRIORITY_MARGIN_INSUFFICIENT` or `NO_ADMISSIBLE_VICTIM` — and the job stays placed. PRD §6.4's non-transition table lists `FR-16(c) PREEMPTION_REFUSED` precisely because refusal is expected traffic, not an error path.
+
+  **Once per victim per Night Window, enforced by a flag rather than by a scheduled event.** AD-1 has **no** `PREEMPTION_WINDOW_CLOSE` event — the earlier draft invented one, which added a second unaccounted way for preemption to stop being allowed and put a phantom event in the restore inventory. FR-16(e) is enforced instead by the victim's `preempted_in_window` flag, set by `T-7` and cleared **only** at `NIGHT_CLOSE`. A `T-7` attempt against a victim whose flag is already set is refused and recorded. The cap is **per victim**: two different jobs may each be preempted once in the same window.
+
+  **A preemption attempted at or after 05:45:00 is refused.** Once the Eviction Ramp has begun, AD-1's placement guard makes any new `RUNNING` state unrecoverable — a preempted victim could not be given a `T-6` — so the attempt is refused by the same guard that governs `T-3`, `T-12` and `T-14`.
+
+  **A re-entered job keeps its place in tonight's Admission Order, and a failed preemption cancels the challenger's placement.** `T-14` returns the victim to `QUEUED_PENDING_WINDOW` with its Checkpoint attached, its **original `submitted_at` preserved**, and `consecutive_nights_missed` **not** incremented, so it re-places the same night when a slot frees — subject to the 05:45:00 guard. The earlier draft deferred the victim to tomorrow's order, which contradicted FR-16(e) and silently cost the job a night of work it had already earned. If the victim's Checkpoint instead fails — `T-9` deadline missed, or `T-10` write failure — the **challenger's placement is cancelled**: the freed slots do not silently go to a job that was admitted on the strength of that preemption. The challenger returns to the Admission Order with a cited `T-18` `DEFER`.
+
+  **The victim's Checkpoint is a precondition, and the resume follows AD-7 in full.** A victim is preempted only if it has a Checkpoint that is `VERIFIED`, or that verifies during the 21:30:00 pre-verification phase and completes by 21:59:00. The victim is evicted to `EVICTED_RESUMABLE`, its slots are released atomically per AD-4, and it re-enters tonight's Admission Order under the `T-14` rule above. A digest mismatch routes it to `FAILED` with `CHECKPOINT_CORRUPT` and issues **no** Cordon Request, per AD-7. `T-22` and `T-23` — a preemption that races a process exit or an OOM — resolve through AD-5's fold rather than by special-casing, so the outcome after restore is whatever the log says it was.
 
   **A non-`self:` citation is unconditional.** Every `PREEMPT` requires a non-`self:` citation by AD-3, because a preemption of a user's work may never be justified solely by a time or bookkeeping reason (PRD §6.2).
 - **Trade-off:** granting the preemption authority solely to the granted tier means a schedule can still come up short when only ungranted work occupies the Margin, and the run ends in `DEFER` rather than preempting. That is the conservative direction, and the alternative — preempting ungranted work — would let a privilege-granting mechanism become a privilege-escalation one. `Preemption Margin = 20` ships uncalibrated per PRD §6.2.
@@ -652,31 +698,42 @@ sequenceDiagram
 - **Status:** `[ADOPTED]`
 - **Binds:** FR-18(a)–(d), FR-20(a)–(f), FR-21(a), FR-22, FR-23(e), NFR-8, NFR-2, F-7, F-16, F-18, Invariant S-2
 - **Prevents:** the "written but not durable" Checkpoint that a resume loads and continues from truncated bytes; a corrupt Checkpoint loaded into a training process, which FR-20's testable condition asserts is zero bytes; a job admitted on an unverified resume; a quarantined artifact deleted by garbage collection; a 46-second SHA-256 pass sitting inside NFR-2's 200 ms activation.
-- **Rule:** The write sequence is `write to a temporary file → fdatasync(file) → atomic rename to the final path → fsync(parent directory) → compute and record the SHA-256 digest`, and the Checkpoint is not durable until all five steps complete. The digest, byte count, step number and Simulated Timestamp are committed together or not at all; a partial or undurable Checkpoint is deleted at once and is never left to be discovered on a later night. A Checkpoint reaches `VERIFIED` only when that record is committed, and that record shares its transaction with the `RESUMED_FROM` transition it enables (AD-2). Resume is admitted only from a Checkpoint re-verified during the 21:30:00 pre-verification phase and complete by 21:59:00; digest verification never occurs inside Window Activation, and a job whose verification is unfinished at 21:59:00 is not admitted that night and is recorded as a cited `DEFER` with reason `UNVERIFIED_RESUME`. A digest mismatch places the Checkpoint in Checkpoint Quarantine and routes the job to `FAILED` with reason `CHECKPOINT_CORRUPT`, citing `self:CHECKPOINT-QUARANTINE-v1` and issuing **no** Cordon Request. The 2 most recent verified Checkpoints of a non-terminal job and every Quarantined Checkpoint are never removed automatically.
+- **Rule:** The write sequence is `write to a temporary file → fdatasync(file) → atomic rename to the final path → fsync(parent directory) → compute and record the SHA-256 digest`, and the Checkpoint is not durable until all five steps complete. The digest, byte count, step number and Simulated Timestamp are committed together or not at all; a partial or undurable Checkpoint is deleted at once and is never left to be discovered on a later night. A Checkpoint reaches `VERIFIED` only when its `T-8` record is committed, and that record shares its transaction with the transition it enables (AD-2) — never with a resume (F-6). Resume is admitted only from a Checkpoint re-verified during the 21:30:00 pre-verification phase and complete by 21:59:00; digest verification never occurs inside Window Activation, and a job whose verification is unfinished at 21:59:00 is not admitted that night and is recorded as a cited `DEFER` with reason `UNVERIFIED_RESUME`. A digest mismatch places the Checkpoint in Checkpoint Quarantine and routes the job to `FAILED` with reason `CHECKPOINT_CORRUPT`, citing `self:CHECKPOINT-QUARANTINE-v1` and issuing **no** Cordon Request. The 2 most recent verified Checkpoints of a non-terminal job and every Quarantined Checkpoint are never removed automatically.
 
-  **The store has a location, a reaper and an escalation path, and a `Job` row carries its bytes.** Checkpoint bytes live under a single store root, separate from the SQLite file, on a filesystem supporting atomic rename. The reaper runs at 03:00:00 as the `CHECKPOINT_REAP` scheduled event and never runs inside a Night Window. It removes only Checkpoints that are outside the 2-most-recent retention set, older than the 7-day grace period, and not Quarantined. `Job.checkpoint_bytes` is the authored current footprint used against NFR-13's fleet-wide bound, and `Job.model_version` exists because the catalog citation `catalog:M5/<model-id>@<version>` requires a version to be attributable — a `Job` without one cannot produce a valid citation and fails FR-2 validation at submission.
+  **`VERIFIED` and `T-12` are two records at two different instants.** The `T-8` record is written at dawn: the Checkpoint is durable and its digest is recorded. The `T-12` record is written at 21:30:00: the digest is **re-verified** and the job is re-admitted. The earlier draft bound a `VERIFIED` record to a `RESUMED_FROM` transition committed in the same transaction; **no such transition exists** in PRD §6.4, so requiring it would have failed every `T-8` against its own 05:53 guard.
 
-  **Store exhaustion escalates rather than silently degrades.** Crossing NFR-13's bound emits the PRD §6.4 non-transition record `NFR-13 STORE_FULL` and stops accepting new Checkpoints for the affected jobs; sustained pressure additionally emits `NFR-13 DISK_PRESSURE_ESCALATION` and halts further Checkpoint writes for the run rather than deleting a protected artifact. Neither path ever removes one of the protected Checkpoints named above. A reaper that cannot free space within the Night Window is an escalation, not a reason to break AD-7's retention rule.
+  **The `T-8` guard reads the instant the fifth step completed, not the commit time.** A Checkpoint whose five steps completed at 05:52:59.9 and commits at 05:53:00.1 is durable and is committed, not deleted; the recorded `sim_instant` is the one at which the fifth step completed. At an identical instant, `T-8` ranks **ahead of** `SIGKILL`, so a Checkpoint that became durable exactly at the deadline is not destroyed by the race.
+
+  **The 21:30 sweep covers `EVICTED_RESUMABLE` *and* `EVICTION_FAILED`.** `T-20` re-admits a job that held a Checkpoint the ramp could not write. If the sweep skipped that state, `T-20` would either resume unverified bytes or never resume at all. Both states are therefore swept, and `T-20` is gated on a digest verified in that phase; a job that fails it takes `T-18 DEFER` with reason `UNVERIFIED_RESUME`.
+
+  **The store has a location, and a `Job` row carries its bytes.** Checkpoint bytes live under a single store root, a sibling of the SQLite file, on a filesystem supporting atomic rename. `Job.checkpoint_bytes` is the authored current footprint used against NFR-13's fleet-wide bound, and `Job.model_version` exists because the catalog citation `catalog:M5/<model-id>@<version>` requires a version to be attributable — a `Job` without one cannot produce a valid citation and fails FR-2 validation at submission.
+
+  **The reaper runs at 03:00:00 — which is *inside* the Night Window — and never during the final fifteen minutes.** The earlier draft said it "never runs inside a Night Window" while scheduling it at 03:00, which is self-contradictory; PRD FR-7(c) and FR-22 put the collection at 03:00. The prohibition is only on **05:45:00–06:00:00**, when the ramp and the deadline are running. The delete predicate is PRD FR-22(a)'s **two arms, verbatim**: an `EXPIRED` job's Checkpoints once their **7-day grace** has elapsed, **or** a Checkpoint superseded beyond the latest **2 verified** — and nothing else. The earlier draft conjoined those two arms into one stricter predicate, which deleted Checkpoints the PRD still protected. The garbage-collection report is a **non-transition record** (`transition: null`).
+
+  **Store pressure refuses new submissions; it never blocks a Ramp or Preemption checkpoint write.** PRD NFR-13(1)(2)(3) verbatim: (1) new **submissions** are refused with the §6.4 record citing reason `STORE_FULL`; (2) an escalation record with reason `DISK_PRESSURE_ESCALATION` is emitted **within 1 simulated minute**; (3) **no protected Checkpoint is deleted**. The reason codes are the registered `STORE_FULL` and `DISK_PRESSURE_ESCALATION` — **never** an `NFR-13`-prefixed string, which AD-3 would reject as unmapped. The earlier draft "stopped accepting new Checkpoints" and then "halted further Checkpoint writes for the run", which would have failed **every** job in the 05:45 ramp and cordoned healthy Nodes for a full store — the exact failure NFR-13(3) exists to prevent. If a write nonetheless fails with cause `STORE_FULL`, `T-10` applies **without a Cordon Request**, because a full store is not evidence of a faulty Node (PRD FR-23(i)). A reaper that cannot free space is an escalation, never a reason to break the retention rule.
+
 - **Trade-off:** the five-step sequence plus the 21:30 phase costs up to 29 simulated minutes before any resume is admissible, moves hashing out of NFR-2's budget, and a full store costs admitted throughput rather than correctness. The price of leaving the hash inside the budget is a 200 ms activation containing a multi-second hash; the price of over-running the store is deferring jobs that would otherwise be admitted.
 
 #### AD-8 — Authorisation is one table, and it never discloses existence
 
 - **Status:** `[ADOPTED]`
-- **Binds:** FR-25, FR-31(a)–(f), NFR-11, F-32, F-40, EXPERIENCE.md Information Architecture
+- **Binds:** FR-25, FR-31(a)–(f), NFR-11, F-32, F-40, EXPERIENCE.md Information Architecture, `POST /auth/session` (ARCHITECTURE §4.1)
 - **Prevents:** the API returning 403 and the console returning 404 for the same resource, which turns the console into an oracle for enumerating other students' `job_id`s; a `STUDENT` reaching an admin surface by a route they were never shown, through a live `g a` / `g n` / `g l` keymap or an un-scoped `GET /jobs?query=`; a bearer token or a display name reaching a log line, a stack trace or a Decision Record; a role refusal silently doing nothing.
 - **Rule:** One `ROLE_CAPABILITY` table maps `(endpoint, resource, role)` to allow or refuse, and it is the only source of that decision — read by the FastAPI dependency **and** by the console route resolver, so the two cannot disagree. Only the opaque `actor_id` from the M1 fixture is stored in a `Job`, a `PriorityGrant`, a `CordonRequest`, a `Notification` or a Decision Record; display names are resolved by the console at render time and never persisted. No token, key or credential is written to any log line, Decision Record, stack trace or response body, and a fixture scan fails the build on a single hit.
 
   **The refusal rule is one rule, and it never discloses existence.** The previous draft of this document asserted both "never 403" and "403 for the wrong role" in the same paragraph without saying which won — precisely the gap two implementers resolve differently. The rule is single-valued:
 
-  | Condition | Response | Decision Record |
+  | Condition | Response | Audit record |
   |---|---|---|
   | No valid bearer token | `401`, no partial work performed | none |
   | Valid token, capability row missing or unknown | `404` | none |
   | Valid token, row refuses, caller does **not** own the resource | `404` | none |
-  | Valid token, row refuses, caller **does** own the resource | `404` | yes — cites the role mismatch internally; the response body is identical to the not-owned case |
+  | Valid token, row refuses, caller **does** own the resource | `404` | a **`LifecycleEvent`** carrying actor, route and time — never a Decision Record; the response body is identical to the not-owned case |
   | Valid token, row allows | `200` | — |
 
-  **Only `401` distinguishes "who are you" from "what may you have".** Every authorisation failure is `404`, whether the resource is absent, not owned, or owned-but-forbidden. The three responses are byte-identical in status and body, so the status code leaks nothing about the resource's existence, its owner, or its role. The role-mismatch Decision Record is still written for the owned case, because FR-31(e) requires the audit trail — it just is not visible in the response. Deny-by-default: an unknown route, an unknown role, or a missing capability row is a `404`, never an allow.
+  **The console authenticates with a session cookie, not a bearer token.** A server-rendered page cannot supply a bearer token on navigation, so the earlier draft's single bearer-token rule was unsatisfiable for every console route. `POST /auth/session` exchanges a validated Module 1 fixture bearer token for an **HttpOnly, SameSite=Strict** session cookie; the console's route resolver reads the actor from the session and applies **the same single `ROLE_CAPABILITY` table** as the API dependency, so the two surfaces cannot disagree by construction and a token never reaches a page. The cookie is `HttpOnly` so script cannot read it and `SameSite=Strict` so it is not sent on a cross-site navigation, and the fixture scan (NFR-11) fails the build if a token ever appears in a rendered page.
+
+  **Only `401` distinguishes "who are you" from "what may you have".** Every authorisation failure is `404`, whether the resource is absent, not owned, or owned-but-forbidden. The three responses are byte-identical in status and body, so the status code leaks nothing about the resource's existence, its owner, or its role. This is the **amended PRD FR-31(e)**, which now reads `404` rather than `403`: a `403` would disclose that the job or route exists and would turn the console into a `job_id` enumerator, which is the exact oracle F-40 forbids. The audit trail is preserved as a **`LifecycleEvent`**, the correct record kind for something that is not a scheduling decision. The earlier draft demanded a Decision Record here, but PRD §6.4 has no row for a role mismatch, so AD-3 would have had to accept an unmapped record to satisfy it — the two rules were in direct contradiction. Deny-by-default: an unknown route, an unknown role, or a missing capability row is a `404`, never an allow.
 - **Trade-off:** every authorisation failure is indistinguishable from a missing resource, so a legitimate user acting on their own forbidden resource gets no actionable message and client-side error reporting stays coarse. Accepted, because the alternative is a disclosure oracle over other students' identifiers, and because a `403` anywhere here converts the console into a `job_id` enumerator.
 
 ### 6.2 Deferred — what this document does not decide
@@ -703,8 +760,8 @@ Carried into Phase 4; none of them blocks the stories above.
 4. **The console's desktop floor.** EXPERIENCE.md OQ-5 and OQ-15: the WCAG 2.1 AA claim holds at and above a floor the PRD does not supply. The floor is a number the architecture cannot choose.
 5. **Per-student Checkpoint disk ownership.** PRD Open Question 4. NFR-13's store bound is fleet-wide and sized from the F-18 formula; nothing here attributes bytes to a submitter.
 6. **The citation authority for an administrator's priority grant.** PRD §6.4's `T-3` row names the administrator's grant record as a ranking source, but PRD §6.2 registers no authority string for it. AD-3 fails closed on a grant-sourced `T-3` until PRD §6.2 registers one. **This stops priority grants from producing Decision Records**, so it needs a PRD amendment, not an architecture choice.
-7. **Three missing PRD §6.4 rows.** `FR-10` drift, `FR-31(e)` role mismatch and `FR-29(a)` OOM advisory have no transition or non-transition row in PRD §6.4. AD-3 fails closed on records for all three. Each is a real, intended record that will be refused — a PRD amendment is required before those three paths can emit anything.
-8. **`PROCESS_EXIT` retry budget and `EVICTION_FAILED` interaction.** AD-1 defines the retry count's owner and reset instant. What the PRD does not fix is whether a job that is `EVICTION_FAILED` and re-admitted by `T-20` also resets that count; AD-1 resolves it as "reset only on an actual admission to `RUNNING`", which is an architecture reading of an underspecified requirement and should be confirmed.
+7. **Two missing PRD §6.4 rows.** `FR-10` drift and `FR-29(a)` OOM advisory have no transition or non-transition row in PRD §6.4. AD-3 fails closed on records for both. Each is a real, intended record that will be refused — a PRD amendment is required before those two paths can emit anything. **`FR-31(e)` is no longer on this list:** the amendment resolved it to a `404` whose audit trail is a `LifecycleEvent` (AD-3), which needs no §6.4 row. The same amendment registered `self:DELEGATE-UNAVAILABLE-v1`, which is what lets a missing delegated verdict be a cited refusal rather than a hang (AD-3, AD-7).
+8. **The `PROCESS_EXIT` retry budget is an architecture reading.** AD-1 resolves it as **one automatic retry per Night Window, reset only at `NIGHT_CLOSE`** — deliberately not by an admission, because a job that crashes on admission, retries and crashes again within one night must exhaust the budget in that night. The PRD does not fix the reset instant, so this is a reading of an underspecified requirement and should be confirmed.
 
 ---
 

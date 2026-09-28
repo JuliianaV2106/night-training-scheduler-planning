@@ -2,6 +2,11 @@
 
 Paquete de planificación asistida por IA (BMad + WDS) para el módulo **Night Training Scheduler** de la plataforma *Academic AI Compute Fabric*.
 
+## Authors
+
+- Juliana Filigrana Valencia
+- Juan Manuel Casanova
+
 ## Estructura
 
 - `planning/` — `prd.md`, `ARCHITECTURE.md`, `readiness-gate-report.md`
