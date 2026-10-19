@@ -1,20 +1,37 @@
 ---
-title: "Module 9 — Night Training Scheduler: Architecture"
+title: "Module 9 — Night Training Scheduler: Architecture (v2)"
 status: final
+version: "2.0.0"
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-10-18
 sources:
   - '{project-root}/planning/prd.md'
   - '{project-root}/ux/EXPERIENCE.md'
   - '{project-root}/reviews/review-prd-adversarial.md'
+  - '{project-root}/planning/detailed-design/contracts.md'
+  - '{project-root}/planning/detailed-design/ports-and-adapters.md'
+  - '{project-root}/planning/detailed-design/schemas/001_night_training_scheduler_schema.sql'
 paradigm: "Deterministic Reducer — event-sourced discrete-event engine, one process"
 ---
 
-# Module 9 — Night Training Scheduler: Architecture
+# Module 9 — Night Training Scheduler: Architecture (v2)
 
-Binding architecture for Phase 3. Every state name, `UJ-N`, `T-N`, `FR-N`, `NFR-N`, reason code, citation authority and persona name below is taken verbatim from `planning/prd.md` and is not translated. `ux/EXPERIENCE.md` and `reviews/review-prd-adversarial.md` are inputs of equal standing. **Where this document and the PRD both speak about behaviour, the PRD wins; where both speak about structure, this document wins.** Nothing here is inferred from a document that does not exist — per PRD §0, `spec.md` and `project-brief.md` were not provided and are not inputs.
+**Solu-2 Detailed Architecture Package Links:**
+- **Behavioral Contracts (P, Q, I):** [`contracts.md`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/planning/detailed-design/contracts.md)
+- **Ports & Adapters Map:** [`ports-and-adapters.md`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/planning/detailed-design/ports-and-adapters.md)
+- **Database Schema DDL:** [`001_night_training_scheduler_schema.sql`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/planning/detailed-design/schemas/001_night_training_scheduler_schema.sql)
+- **Data Transfer Objects (DTOs):** [`dto.py`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/planning/detailed-design/schemas/dto.py)
+- **Event Schemas:** [`events.md`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/planning/detailed-design/schemas/events.md)
+- **OpenAPI 3.0 Contract:** [`openapi.yaml`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/planning/detailed-design/schemas/openapi.yaml)
+- **Sprint Backlog (Epics & Stories):** [`epics.md`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/planning/epics.md)
+- **Sprint Status Tracking:** [`sprint-status.yaml`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/implementation-artifacts/sprint-status.yaml)
+- **Test Strategy & ATDD Suite:** [`test-design.md`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/test/test-design.md) · [`contracts_test.py`](file:///c:/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/test/atdd/night_training_scheduler_contracts_test.py)
+
+Binding architecture for Solu-2. Every state name, `UJ-N`, `T-N`, `FR-N`, `NFR-N`, reason code, citation authority and persona name below is taken verbatim from `planning/prd.md` and is not translated. `ux/EXPERIENCE.md` and `reviews/review-prd-adversarial.md` are inputs of equal standing. **Where this document and the PRD both speak about behaviour, the PRD wins; where both speak about structure, this document wins.** Nothing here is inferred from a document that does not exist — per PRD §0, `spec.md` and `project-brief.md` were not provided and are not inputs.
 
 **Reference convention.** A bare `§N` in this document always means **PRD §N**, because this document has no numbered sections beyond its own six. Where this document refers to itself it says "ARCHITECTURE §N" or names the AD. `T-N` identifiers are the PRD §6.4 transition ids.
+
+**Revision note (v2.0.0 — 2026-10-18).** Updated for Solu-2 Enterprise Solutioning. Binds formal behavioral contracts (`planning/detailed-design/contracts.md`), hexagonal ports and adapters mapping (`planning/detailed-design/ports-and-adapters.md`), physical SQLite constraints (`001_night_training_scheduler_schema.sql`), typed Pydantic DTOs, and CloudEvents telemetry. Stack decisions formalized in §1.3.1. Zero elastic language permitted.
 
 **Revision note (2026-09-28).** Two independent reviews (`reviews/review-arch-adversarial.md`, `reviews/review-arch-edge-cases.md`) returned 30 findings, all accepted by the team; their resolutions are applied here. Two are PRD amendments, referenced here rather than restated: **FR-31(e) now reads 404**, not 403, and **`self:DELEGATE-UNAVAILABLE-v1`** is now a registered citation authority in PRD §6.2. One identifier moved: the former AD-6 ("time and rate are separate") was absorbed into AD-1, and the freed slot became **AD-6 (Preemption)**, which FR-16 required and had no home for. AD-1 … AD-8 are now stable and citable for Phase 3.
 
@@ -54,6 +71,13 @@ Binding architecture for Phase 3. Every state name, `UJ-N`, `T-N`, `FR-N`, `NFR-
 ### 1.3 Stack
 
 **Python 3.12+, FastAPI, SQLite, Jinja/HTMX — exact versions pinned in `requirements.txt` at implementation time.**
+
+#### 1.3.1 Stack Decisions (Step 0.3 Formal Declaration)
+1. **Language & Runtime:** Python 3.12+ (CPython, typed models via Pydantic v2).
+2. **Web Framework:** FastAPI (ASGI via Uvicorn, serving auto-generated OpenAPI 3.0 at `/docs` and server-rendered Jinja2/HTMX templates).
+3. **Persistence Engine:** SQLite 3 (via standard library `sqlite3`, WAL journal mode, `synchronous=FULL`, single long-lived writer).
+4. **Test Framework:** pytest (with `pytest-asyncio` for async testing and `hypothesis` for property-based state invariant testing).
+5. **Time Injection:** `ClockPort` / `SimulatedClockPort` (outbound port injecting deterministic `sim_instant: datetime` with explicit `America/Bogota` UTC-05:00 offset; zero wall-clock reads in core domain).
 
 This section deliberately carries **no version numbers and no release dates**. An earlier draft pinned specific versions and dates; a review found the pins wrong, and that failure mode recurs on any date a document outlives. The stack is a *choice of technologies*; currency is a property of the lockfile, which is regenerated and verified at implementation time rather than asserted in an architecture document.
 
