@@ -26,7 +26,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-1` (queue integrity), `AD-4` (single-node boundary), `INV-01` (queue cap).
 - **Files Touched:** `api/routes/jobs.py`, `ports/in/job_submission.py`, `domain/engine.py`, `adapters/db/sqlite_repository.py`.
 - **Schema & DTOs:** `JobSubmissionRequestDTO`, `JobSubmissionResponseDTO`, `JobSpecDTO`, `001_night_training_scheduler_schema.sql` (`jobs` table).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_happy_path_admits_and_persists_pending_job`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_happy_path_admits_and_persists_pending_job`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** an authenticated student actor `student-kavita` and a valid single-node `JobSpecDTO` requesting 1 GPU (24 GB)
@@ -44,7 +44,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-4` (fleet scope), `INV-03`.
 - **Files Touched:** `ports/in/job_submission.py`, `domain/engine.py`.
 - **Schema & DTOs:** `JobSpecDTO` (`worker_count`, `replicas`, `distributed_artifact_present`), `ErrorBodyDTO`.
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_precondition_violation_distributed_spec_rejected_with_zero_state_mutation`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_precondition_violation_distributed_spec_rejected_with_zero_state_mutation`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** a spec with `worker_count = 1` and `replicas = 1`
@@ -62,12 +62,12 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-1`, `AD-4` (deterministic total order), `INV-04`.
 - **Files Touched:** `ports/in/window_activation.py`, `domain/ranking.py`, `domain/allocation.py`, `adapters/db/sqlite_repository.py`.
 - **Schema & DTOs:** `WindowActivationRequestDTO`, `WindowActivationResultDTO`, `PlacementDTO`, `001_night_training_scheduler_schema.sql` (`gpu_slots`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_happy_path_places_jobs_deterministically`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_happy_path_places_jobs_deterministically`
 - **Gherkin Scenarios:**
   - *Happy Path:*
-    - **Given** simulated time advances to `22:00:00-05:00` with 5 queued jobs and 31 healthy workstation slots
+    - **Given** simulated time advances to `22:00:00-05:00` with 5 queued 1-GPU jobs and all 33 GPU slots free
     - **When** `activateWindow` is executed
-    - **Then** the jobs are sorted by Admission Order, placed into slots `ws-gpu-01..05`, their state becomes `RUNNING`, and one atomic transaction commits all placements.
+    - **Then** the jobs are sorted by Admission Order, placed by the AD-4 node total order (prior node → lowest `allocations_held` → `node_id` ascending) onto `server-gpu-01`, `ws-gpu-01`, `ws-gpu-02`, `ws-gpu-03`, `ws-gpu-04`, their state becomes `RUNNING`, and one atomic transaction commits all placements.
   - *Failure Path (Activation Outside Window):*
     - **Given** simulated time is `14:00:00-05:00` (daytime)
     - **When** `activateWindow` is triggered
@@ -80,7 +80,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-1`, `AD-4`, `INV-02`.
 - **Files Touched:** `domain/engine.py`, `domain/state_machine.py`, `adapters/db/sqlite_repository.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`jobs.state = 'COMPLETED'`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_evict_at_deadline_happy_path_completes_checkpoint_and_releases_slots`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_evict_at_deadline_happy_path_completes_checkpoint_and_releases_slots`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** job `JOB-0001` running on `ws-gpu-05` finishes its final step at `04:15:00`
@@ -100,7 +100,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-1`, `AD-4`, `AD-7`, `Invariant S-1`, `INV-02`, `INV-05`.
 - **Files Touched:** `ports/in/eviction.py`, `domain/engine.py`, `adapters/sim/simulated_delegates.py`, `adapters/db/sqlite_repository.py`.
 - **Schema & DTOs:** `EvictionRequestDTO`, `EvictionResultDTO`, `001_night_training_scheduler_schema.sql` (`cordon_requests`, `nodes.status = 'CORDONED'`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_mandatory_edge_case_checkpoint_failure_at_dawn_cordons_node_releases_all_slots_at_0600`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_mandatory_edge_case_checkpoint_failure_at_dawn_cordons_node_releases_all_slots_at_0600`
 - **Gherkin Scenarios:**
   - *Happy Path (Dawn Ramp with Verified Checkpoint):*
     - **Given** job `JOB-0002` running on `ws-gpu-10` at `05:45:00`
@@ -118,7 +118,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-1`, `AD-7`.
 - **Files Touched:** `ports/out/notification_outbox.py`, `adapters/sim/in_memory_outbox.py`, `domain/engine.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`audit_events`), `events.md` (`JobEvictedPayload`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_mandatory_edge_case_user_notified_and_job_rescheduled_after_dawn_checkpoint_failure`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_mandatory_edge_case_user_notified_and_job_rescheduled_after_dawn_checkpoint_failure`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** job `JOB-EDGE-001` enters `EVICTION_FAILED` at dawn
@@ -132,7 +132,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-7`, `Invariant S-2`, `INV-06`.
 - **Files Touched:** `adapters/sim/filesystem_checkpoint_store.py`, `domain/engine.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`checkpoints.state = 'QUARANTINED'`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_checkpoint_digest_mismatch_quarantines_file_and_fails_job`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_checkpoint_digest_mismatch_quarantines_file_and_fails_job`
 - **Gherkin Scenarios:**
   - *Failure Path (Corrupt Digest):*
     - **Given** an evicted job with checkpoint file on disk whose content was altered (digest mismatch)
@@ -152,7 +152,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-4`, `INV-03`.
 - **Files Touched:** `domain/allocation.py`, `domain/engine.py`, `adapters/db/sqlite_repository.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`check_two_gpu_requires_48gb`), `PlacementDTO`.
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_atomic_server_gpu_allocation`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_atomic_server_gpu_allocation`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** a 2-GPU job requesting 48 GB VRAM and `server-gpu-01` having both slots free
@@ -170,7 +170,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-4`, `INV-02`.
 - **Files Touched:** `domain/allocation.py`, `domain/ranking.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`nodes`, `gpu_slots`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_total_allocated_slots_never_exceeds_33`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_total_allocated_slots_never_exceeds_33`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** 40 eligible jobs competing for 33 GPU slots
@@ -184,7 +184,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-1`, `INV-01`.
 - **Files Touched:** `adapters/db/sqlite_repository.py`, `domain/engine.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`idx_active_jobs_state`), `ErrorBodyDTO`.
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_queue_cap_500_enforced_under_burst_submissions`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_queue_cap_500_enforced_under_burst_submissions`
 - **Gherkin Scenarios:**
   - *Failure Path (Queue Cap Exceeded):*
     - **Given** the database already contains 500 non-terminal jobs
@@ -198,7 +198,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-2`, `AD-5`, `INV-04`.
 - **Files Touched:** `adapters/db/sqlite_repository.py`, `domain/engine.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`decision_records`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_queue_cap_500_enforced_under_burst_submissions`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_queue_cap_500_enforced_under_burst_submissions`
 - **Gherkin Scenarios:**
   - *Happy Path (Crash Recovery):*
     - **Given** process terminated abruptly during a simulation run
@@ -218,7 +218,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-3`, `INV-04`.
 - **Files Touched:** `api/routes/board.py`, `domain/emitter.py`, `schemas/dto.py`.
 - **Schema & DTOs:** `ExplanationDTO`, `001_night_training_scheduler_schema.sql` (`decision_records.citations`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_explainability_payload_cites_jobspec_validation_rule`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_explainability_payload_cites_jobspec_validation_rule`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** a job admitted or deferred by the scheduler
@@ -232,7 +232,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-6`, `INV-08`.
 - **Files Touched:** `domain/state_machine.py`, `domain/allocation.py`, `domain/engine.py`.
 - **Schema & DTOs:** `001_night_training_scheduler_schema.sql` (`jobs.preempted_in_window`, `jobs.granted_priority`).
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_atomic_server_gpu_allocation`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_atomic_server_gpu_allocation`
 - **Gherkin Scenarios:**
   - *Happy Path:*
     - **Given** a challenger with `THESIS` priority delta $\ge 20$ over a victim whose `preempted_in_window == 0`
@@ -250,7 +250,7 @@ This backlog specifies 4 vertical slices delivering user-visible value for named
 - **Binding Invariants:** `AD-8`, `INV-07`.
 - **Files Touched:** `api/routes/auth.py`, `api/routes/jobs.py`.
 - **Schema & DTOs:** `ErrorBodyDTO`, `AD-8` `ROLE_CAPABILITY` table.
-- **ATDD Test Path:** `test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_precondition_violation_distributed_spec_rejected_with_zero_state_mutation`
+- **ATDD Test Path:** `tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_precondition_violation_distributed_spec_rejected_with_zero_state_mutation`
 - **Gherkin Scenarios:**
   - *Happy Path (Owner Access):*
     - **Given** an authenticated student querying their own job `JOB-0001`

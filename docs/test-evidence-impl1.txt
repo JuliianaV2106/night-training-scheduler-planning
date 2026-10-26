@@ -1,0 +1,54 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-8.3.4, pluggy-1.7.0 -- C:\Users\julii\Desktop\9 semestre\Desarrollo asistido por IA\Proyecto final\.venv\Scripts\python.exe
+rootdir: C:\Users\julii\Desktop\9 semestre\Desarrollo asistido por IA\Proyecto final
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.15.1
+collecting ... collected 49 items / 5 deselected / 44 selected
+
+tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_happy_path_admits_and_persists_pending_job PASSED [  2%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_precondition_violation_distributed_spec_rejected_with_zero_state_mutation PASSED [  4%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_queue_cap_500_enforced_under_burst_submissions PASSED [  6%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_two_gpu_requires_48gb_physically_enforced PASSED [  9%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_explainability_payload_cites_jobspec_validation_rule PASSED [ 11%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_happy_path_places_jobs_deterministically PASSED [ 13%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_precondition_violation_outside_window_rejected PASSED [ 15%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_total_allocated_slots_never_exceeds_33 PASSED [ 18%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_atomic_server_gpu_allocation PASSED [ 20%]
+tests/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_explainability_payload_cites_policy_and_admission_ranking PASSED [ 22%]
+tests/unit/test_scaffold.py::test_migration_seeds_the_fleet_exactly_as_the_json_fixture PASSED [ 25%]
+tests/unit/test_scaffold.py::test_health_probe_reports_simulated_instant PASSED [ 27%]
+tests/unit/test_scaffold.py::test_app_refuses_to_start_with_a_broken_fleet_seed PASSED [ 29%]
+tests/unit/test_scaffold.py::test_settings_reject_naive_sim_instant PASSED [ 31%]
+tests/unit/test_scaffold.py::test_domain_layer_imports_no_framework_io_or_clock PASSED [ 34%]
+tests/unit/test_story_1_1_job_submission.py::TestHappyPath::test_returns_201_with_contract_payload PASSED [ 36%]
+tests/unit/test_story_1_1_job_submission.py::TestHappyPath::test_commits_exactly_one_job_decision_and_audit_event PASSED [ 38%]
+tests/unit/test_story_1_1_job_submission.py::TestHappyPath::test_job_ids_and_queue_positions_are_sequential PASSED [ 40%]
+tests/unit/test_story_1_1_job_submission.py::TestHappyPath::test_submission_after_window_open_targets_next_night PASSED [ 43%]
+tests/unit/test_story_1_1_job_submission.py::TestIdempotency::test_identical_resubmission_returns_200_with_original_job PASSED [ 45%]
+tests/unit/test_story_1_1_job_submission.py::TestIdempotency::test_same_key_different_payload_is_409_with_zero_inserts PASSED [ 47%]
+tests/unit/test_story_1_1_job_submission.py::TestValidationGates::test_malformed_image_digest_is_422_structured_error PASSED [ 50%]
+tests/unit/test_story_1_1_job_submission.py::TestValidationGates::test_two_gpu_on_24gb_is_422_two_gpu_requires_48gb PASSED [ 52%]
+tests/unit/test_story_1_1_job_submission.py::TestValidationGates::test_duration_over_max_night_span_is_422 PASSED [ 54%]
+tests/unit/test_story_1_1_job_submission.py::TestValidationGates::test_missing_spec_is_422_not_a_stack_trace PASSED [ 56%]
+tests/unit/test_story_1_1_job_submission.py::TestValidationGates::test_queue_cap_is_429_and_retryable PASSED [ 59%]
+tests/unit/test_story_1_2_scope_boundary.py::test_single_node_spec_passes_to_queue_evaluation PASSED [ 61%]
+tests/unit/test_story_1_2_scope_boundary.py::test_distributed_spec_is_400_with_zero_mutation[worker_count=4] PASSED [ 63%]
+tests/unit/test_story_1_2_scope_boundary.py::test_distributed_spec_is_400_with_zero_mutation[replicas=2] PASSED [ 65%]
+tests/unit/test_story_1_2_scope_boundary.py::test_distributed_spec_is_400_with_zero_mutation[distributed_artifact] PASSED [ 68%]
+tests/unit/test_story_1_2_scope_boundary.py::test_scope_check_runs_before_idempotency_lookup PASSED [ 70%]
+tests/unit/test_story_1_3_window_activation.py::TestHappyPath::test_places_all_queued_jobs_and_marks_them_running PASSED [ 72%]
+tests/unit/test_story_1_3_window_activation.py::TestHappyPath::test_node_choice_follows_ad4_total_order PASSED [ 75%]
+tests/unit/test_story_1_3_window_activation.py::TestHappyPath::test_admission_order_prefers_higher_priority_then_older_submission PASSED [ 77%]
+tests/unit/test_story_1_3_window_activation.py::TestHappyPath::test_each_placement_writes_a_cited_decision_record PASSED [ 79%]
+tests/unit/test_story_1_3_window_activation.py::TestCapacityAndInvariants::test_overflow_beyond_33_slots_is_deferred_capacity_exhausted PASSED [ 81%]
+tests/unit/test_story_1_3_window_activation.py::TestCapacityAndInvariants::test_two_gpu_job_takes_both_server_slots_atomically PASSED [ 84%]
+tests/unit/test_story_1_3_window_activation.py::TestCapacityAndInvariants::test_two_gpu_job_never_holds_one_slot_when_server_is_half_full PASSED [ 86%]
+tests/unit/test_story_1_3_window_activation.py::TestCapacityAndInvariants::test_48gb_job_with_server_cordoned_is_deferred_no_eligible_node PASSED [ 88%]
+tests/unit/test_story_1_3_window_activation.py::TestCapacityAndInvariants::test_cordoned_workstation_is_never_selected PASSED [ 90%]
+tests/unit/test_story_1_3_window_activation.py::TestCapacityAndInvariants::test_repeated_activation_is_idempotent PASSED [ 93%]
+tests/unit/test_story_1_3_window_activation.py::TestOutsideWindow::test_daytime_activation_is_400_with_zero_placements PASSED [ 95%]
+tests/unit/test_story_1_3_window_activation.py::TestOutsideWindow::test_two_second_tolerance_is_accepted_and_three_seconds_rejected PASSED [ 97%]
+tests/unit/test_story_1_3_window_activation.py::TestOutsideWindow::test_malformed_or_naive_instant_is_400_structured_error PASSED [100%]
+
+====================== 44 passed, 5 deselected in 1.58s =======================
