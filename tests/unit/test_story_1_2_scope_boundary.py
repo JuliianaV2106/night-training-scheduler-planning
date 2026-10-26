@@ -45,3 +45,16 @@ def test_scope_check_runs_before_idempotency_lookup(client, db):
 
     assert res.status_code == 201
     assert count_jobs(db) == 1
+
+
+@pytest.mark.parametrize("override", [{"worker_count": 0}, {"replicas": 0}], ids=["worker_count=0", "replicas=0"])
+def test_count_below_one_is_422_validation_not_out_of_scope(client, db, override):
+    """Impl-1 inspection finding F-2: the catalog triggers OUT_OF_SCOPE_DISTRIBUTED on `> 1`.
+    Zero workers is not a distributed job, so it must be a 422 range violation, not a 400 routed to Module 10."""
+    res = client.post(JOBS_URL, json=job_payload("zero-key", **override))
+
+    assert res.status_code == 422
+    body = res.json()
+    assert body["error_code"] == "VALIDATION_FAILED"
+    assert "Module 10" not in body["message"]
+    assert count_jobs(db) == 0

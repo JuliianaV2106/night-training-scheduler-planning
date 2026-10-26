@@ -42,8 +42,12 @@ def payload_digest(spec: JobSpec) -> str:
 
 
 def check_single_node_scope(spec: JobSpec) -> None:
-    """P1: Module 9 only schedules single-node jobs (Story 1.2)."""
-    if spec.worker_count != 1 or spec.replicas != 1 or spec.distributed_artifact_present:
+    """P1: Module 9 only schedules single-node jobs (Story 1.2).
+
+    The catalog trigger is `> 1`: a count below 1 is not a distributed job but a range
+    violation, reported by check_spec_ranges as VALIDATION_FAILED.
+    """
+    if spec.worker_count > 1 or spec.replicas > 1 or spec.distributed_artifact_present:
         raise OutOfScopeDistributed(
             f"Job submission specifies distributed multi-node execution "
             f"(worker_count={spec.worker_count}, replicas={spec.replicas}). "
@@ -78,6 +82,10 @@ def _field_failure(field_name: str, observed: object, constraint: str) -> Valida
 
 def check_spec_ranges(spec: JobSpec) -> None:
     """P2: type and range checks. Re-asserted here so the domain never trusts the adapter."""
+    if spec.worker_count < 1:
+        raise _field_failure("worker_count", spec.worker_count, "{1}")
+    if spec.replicas < 1:
+        raise _field_failure("replicas", spec.replicas, "{1}")
     if not IMAGE_DIGEST_RE.match(spec.image_digest):
         raise _field_failure("image_digest", spec.image_digest, "^sha256:[a-f0-9]{64}$")
     if spec.gpu_slots_requested not in (1, 2):
