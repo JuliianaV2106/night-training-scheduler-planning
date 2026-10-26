@@ -1,45 +1,51 @@
 """
-Executable ATDD Red-Phase Contract Suite: Module 9 — Night Training Scheduler
+Executable ATDD Contract Suite: Module 9 — Night Training Scheduler (Solu-2, promoted in Impl-1).
+
 Tests Design-by-Contract postconditions, precondition rejections, invariants,
 explainability payloads, and the Mandatory Edge Case.
 
-Stop-Point Rule Verification:
-All tests call interface stubs that raise NotImplementedError, failing for the
-right reason (RED phase). Zero tautological assertions (no assert True or empty mocks).
+Impl-1: submitJob and activateWindow run against the real services (GREEN).
+evictAtDeadline (Epic 2) keeps its red-phase stub and is marked `impl2`
+(deselected by default in pytest.ini; run with `pytest -m impl2`).
 """
 
-import pytest
+import json
 import sqlite3
-from datetime import datetime
-from dto import (
+
+import pytest
+
+from src.domain.errors import (
+    OutOfScopeDistributed,
+    QueueCapExceeded,
+    TwoGpuRequires48Gb,
+    WindowActivationOutsideWindow,
+)
+from src.ports.dto import (
+    EvictionRequestDTO,
+    EvictionResultDTO,
     JobSpecDTO,
     JobSubmissionRequestDTO,
     JobSubmissionResponseDTO,
     WindowActivationRequestDTO,
     WindowActivationResultDTO,
-    EvictionRequestDTO,
-    EvictionResultDTO,
 )
-from test.stubs.interfaces import (
-    JobSubmissionServiceStub,
-    WindowActivationServiceStub,
-    EvictionServiceStub,
-)
-from test.fixtures.explain_assert import assert_explainability
-
+from tests.fixtures.explain_assert import assert_explainability
+from tests.stubs.interfaces import EvictionServiceStub
 
 # =============================================================================
 # Helper Fixtures & Builders
 # =============================================================================
 
 @pytest.fixture
-def submission_stub() -> JobSubmissionServiceStub:
-    return JobSubmissionServiceStub()
+def submission_stub(submission_service):
+    """Real JobSubmissionService (fixture name kept from the Solu-2 red-phase suite)."""
+    return submission_service
 
 
 @pytest.fixture
-def activation_stub() -> WindowActivationServiceStub:
-    return WindowActivationServiceStub()
+def activation_stub(activation_service):
+    """Real WindowActivationService (fixture name kept from the Solu-2 red-phase suite)."""
+    return activation_service
 
 
 @pytest.fixture
@@ -69,6 +75,23 @@ def build_valid_job_spec(
     )
 
 
+def submit(service, key: str, clock, spec: JobSpecDTO = None) -> JobSubmissionResponseDTO:
+    return service.submit_job(
+        JobSubmissionRequestDTO(idempotency_key=key, actor_id="student-kavita",
+                                spec=spec or build_valid_job_spec()),
+        at=clock.advance(1),
+    )
+
+
+def decision_record(db, job_id: str, transition: str) -> dict:
+    row = db.execute(
+        "SELECT citations, inputs FROM decision_records WHERE job_id = ? AND transition = ?",
+        (job_id, transition),
+    ).fetchone()
+    assert row is not None, f"No decision record {transition} for {job_id}"
+    return {"citations": json.loads(row[0]), "inputs": json.loads(row[1])}
+
+
 # =============================================================================
 # 1. Operation 1: submitJob Tests
 # =============================================================================
@@ -87,7 +110,6 @@ class TestSubmitJobContract:
             spec=spec
         )
 
-        # Call interface stub directly (must raise NotImplementedError in Unit 4)
         res: JobSubmissionResponseDTO = submission_stub.submit_job(req, at=fake_clock.now())
 
         # Real postcondition assertions:
@@ -117,7 +139,8 @@ class TestSubmitJobContract:
             spec=spec
         )
 
-        submission_stub.submit_job(req)
+        with pytest.raises(OutOfScopeDistributed):
+            submission_stub.submit_job(req)
 
         # Physical assertion on Q-fail: zero records inserted
         cursor = db.cursor()
@@ -140,7 +163,7 @@ class TestSubmitJobContract:
                     estimated_duration_s, image_digest, model_id, model_version,
                     storage_request_bytes, submitted_at
                 ) VALUES (
-                    ?, 'QUEUED_PENDING_WINDOW', 'user-batch', ?, 'digest000000000000000000000000000000000000000000000000000000000000',
+                    ?, 'QUEUED_PENDING_WINDOW', 'user-batch', ?, '0000000000000000000000000000000000000000000000000000000000000000',
                     1, 24, 15, 3600, 'sha256:' || hex(randomblob(32)), 'model-1', '1.0', 1000, '2026-10-18T20:00:00-05:00'
                 )
                 """,
@@ -156,7 +179,8 @@ class TestSubmitJobContract:
             spec=spec
         )
 
-        submission_stub.submit_job(req)
+        with pytest.raises(QueueCapExceeded):
+            submission_stub.submit_job(req)
 
         # Assert 501st job is not persisted
         cursor.execute("SELECT COUNT(*) FROM jobs WHERE state NOT IN ('COMPLETED', 'FAILED', 'REJECTED', 'EXPIRED')")
@@ -167,14 +191,15 @@ class TestSubmitJobContract:
         self, submission_stub, db
     ):
         """Invariant (INV-03 / AD-4): 2-GPU job requested on 24GB hardware rejected."""
-        spec = build_valid_job_spec(gpu_slots=2, vram_gb=48)
-        # Spec with 2 GPUs on 24GB VRAM
+        # Spec with 2 GPUs on 24GB VRAM (the Solu-2 draft passed vram_gb=48, which is a valid spec)
+        spec = build_valid_job_spec(gpu_slots=2, vram_gb=24)
         req = JobSubmissionRequestDTO(
             idempotency_key="idemp-2gpu-24gb",
             actor_id="student-invalid-vram",
             spec=spec
         )
-        submission_stub.submit_job(req)
+        with pytest.raises(TwoGpuRequires48Gb):
+            submission_stub.submit_job(req)
 
         # Assert database constraint rejects invalid tuple physically if reached
         cursor = db.cursor()
@@ -187,16 +212,16 @@ class TestSubmitJobContract:
                     estimated_duration_s, image_digest, model_id, model_version,
                     storage_request_bytes, submitted_at
                 ) VALUES (
-                    'JOB-INV3', 'QUEUED_PENDING_WINDOW', 'user-inv3', 'key-inv3', 'digest000000000000000000000000000000000000000000000000000000000000',
+                    'JOB-INV3', 'QUEUED_PENDING_WINDOW', 'user-inv3', 'key-inv3', '0000000000000000000000000000000000000000000000000000000000000000',
                     2, 24, 15, 3600, 'sha256:' || hex(randomblob(32)), 'model-1', '1.0', 1000, '2026-10-18T20:00:00-05:00'
                 )
                 """
             )
 
     def test_submit_job_explainability_payload_cites_jobspec_validation_rule(
-        self, submission_stub, fake_clock
+        self, submission_stub, db, fake_clock
     ):
-        """Explainability (Q4): Valid submission carries cited validation authority."""
+        """Explainability (Q4): the ADMIT T-1 Decision Record carries the cited validation authority."""
         spec = build_valid_job_spec()
         req = JobSubmissionRequestDTO(
             idempotency_key="idemp-explain-01",
@@ -205,8 +230,9 @@ class TestSubmitJobContract:
         )
 
         res = submission_stub.submit_job(req, at=fake_clock.now())
+        # The OpenAPI JobSubmissionResponse carries no citations; Q4 lives in the Decision Record.
         assert_explainability(
-            res,
+            decision_record(db, res.job_id, "T-1"),
             expected_rule_id="self:JOBSPEC-VALIDATION-v1",
             required_keys=["gpu_slots_requested", "required_vram_gb"]
         )
@@ -220,15 +246,17 @@ class TestActivateWindowContract:
     """Contract tests for activateWindow."""
 
     def test_activate_window_happy_path_places_jobs_deterministically(
-        self, activation_stub, db, fake_clock
+        self, submission_stub, activation_stub, db, fake_clock
     ):
         """Happy Path (Q holds): At 22:00:00, queued jobs are placed into 33 slots."""
+        for i in range(5):
+            submit(submission_stub, f"idemp-act-{i}", fake_clock)
         fake_clock.jump_to("2026-10-18T22:00:00-05:00")
         req = WindowActivationRequestDTO(sim_instant=fake_clock.now().isoformat())
 
         result: WindowActivationResultDTO = activation_stub.activate_window(req)
         assert result.sim_instant.endswith("22:00:00-05:00")
-        assert result.admitted_count <= 33
+        assert result.admitted_count == 5
         assert len(result.placements) == result.admitted_count
 
         # Verify slot occupancy reflects placements
@@ -238,18 +266,25 @@ class TestActivateWindowContract:
         assert allocated_slots == result.admitted_count
 
     def test_activate_window_precondition_violation_outside_window_rejected(
-        self, activation_stub, fake_clock
+        self, activation_stub, db, fake_clock
     ):
         """Precondition Violation (P1): Activation rejected outside 22:00:00."""
         fake_clock.jump_to("2026-10-18T14:30:00-05:00")  # Daytime
         req = WindowActivationRequestDTO(sim_instant=fake_clock.now().isoformat())
 
-        activation_stub.activate_window(req)
+        with pytest.raises(WindowActivationOutsideWindow):
+            activation_stub.activate_window(req)
+
+        cursor = db.cursor()
+        cursor.execute("SELECT COUNT(*) FROM gpu_slots WHERE allocated_job_id IS NOT NULL")
+        assert cursor.fetchone()[0] == 0
 
     def test_activate_window_invariant_total_allocated_slots_never_exceeds_33(
-        self, activation_stub, db, fake_clock
+        self, submission_stub, activation_stub, db, fake_clock
     ):
         """Invariant (AD-4): Fleet active allocations count <= 33 slots."""
+        for i in range(40):
+            submit(submission_stub, f"idemp-burst-{i}", fake_clock)
         fake_clock.jump_to("2026-10-18T22:00:00-05:00")
         req = WindowActivationRequestDTO(sim_instant=fake_clock.now().isoformat())
 
@@ -257,16 +292,18 @@ class TestActivateWindowContract:
         cursor = db.cursor()
         cursor.execute("SELECT COUNT(*) FROM gpu_slots WHERE allocated_job_id IS NOT NULL")
         active_slots = cursor.fetchone()[0]
-        assert active_slots <= 33, f"Fleet over-allocation detected: {active_slots} slots held"
+        assert active_slots == 33, f"Fleet over-allocation detected: {active_slots} slots held"
 
     def test_activate_window_invariant_atomic_server_gpu_allocation(
-        self, activation_stub, db, fake_clock
+        self, submission_stub, activation_stub, db, fake_clock
     ):
         """Invariant (AD-4): server-gpu-01 allocates both slots atomically for 2-GPU jobs."""
+        submit(submission_stub, "idemp-2gpu", fake_clock, build_valid_job_spec(gpu_slots=2, vram_gb=48))
         fake_clock.jump_to("2026-10-18T22:00:00-05:00")
         req = WindowActivationRequestDTO(sim_instant=fake_clock.now().isoformat())
 
         res = activation_stub.activate_window(req)
+        assert [len(p.slot_ids) for p in res.placements] == [2]
         for placement in res.placements:
             if placement.node_id == "server-gpu-01" and len(placement.slot_ids) == 2:
                 cursor = db.cursor()
@@ -275,24 +312,26 @@ class TestActivateWindowContract:
                 assert rows[0][0] == rows[1][0] == placement.job_id
 
     def test_activate_window_explainability_payload_cites_policy_and_admission_ranking(
-        self, activation_stub, fake_clock
+        self, submission_stub, activation_stub, db, fake_clock
     ):
-        """Explainability (Q4): Activation citations include policy and ranking rules."""
+        """Explainability (Q4): each placement record cites the night-window policy and ranking rule."""
+        queued = submit(submission_stub, "idemp-explain-act", fake_clock)
         fake_clock.jump_to("2026-10-18T22:00:00-05:00")
         req = WindowActivationRequestDTO(sim_instant=fake_clock.now().isoformat())
 
-        res = activation_stub.activate_window(req)
+        activation_stub.activate_window(req)
         assert_explainability(
-            res,
+            decision_record(db, queued.job_id, "T-3"),
             expected_rule_id="self:ADMISSION-RANKING-v1",
             required_keys=["total_evaluated", "admitted_count"]
         )
 
 
 # =============================================================================
-# 3. Operation 3: evictAtDeadline & Mandatory Edge Case Tests
+# 3. Operation 3: evictAtDeadline & Mandatory Edge Case Tests (Impl-2 scope)
 # =============================================================================
 
+@pytest.mark.impl2
 class TestEvictAtDeadlineContract:
     """Contract tests for evictAtDeadline and the Mandatory Edge Case."""
 
@@ -339,7 +378,7 @@ class TestEvictAtDeadlineContract:
                 estimated_duration_s, image_digest, model_id, model_version,
                 storage_request_bytes, submitted_at, allocated_node_id
             ) VALUES (
-                ?, 'RUNNING', 'student-maria', 'key-edge-01', 'digest000000000000000000000000000000000000000000000000000000000000',
+                ?, 'RUNNING', 'student-maria', 'key-edge-01', '0000000000000000000000000000000000000000000000000000000000000000',
                 1, 24, 15, 14400, 'sha256:' || hex(randomblob(32)), 'model-1', '1.0', 1000,
                 '2026-10-18T20:00:00-05:00', ?
             )
