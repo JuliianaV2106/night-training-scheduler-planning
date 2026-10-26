@@ -1,5 +1,5 @@
 """
-submitJob use case (Story 1.1) — contracts.md §2.1.
+submitJob use case (Stories 1.1 and 1.2) — contracts.md §2.1.
 
 Orchestrates pure domain checks and the repository inside one transaction.
 """
@@ -15,6 +15,7 @@ from src.domain.policies import (
     POLICY_NIGHT_WINDOW,
     RULE_JOBSPEC,
     check_queue_capacity,
+    check_single_node_scope,
     check_spec_ranges,
     next_window_date,
     payload_digest,
@@ -40,7 +41,8 @@ class JobSubmissionService:
         at = at or self._clock.now()
         spec = JobSpec(**request.spec.model_dump())
 
-        # P2: pure checks run before any read or write (Q-fail: zero mutation).
+        # P1 then P2: pure checks run before any read or write (Q-fail: zero mutation).
+        check_single_node_scope(spec)
         check_spec_ranges(spec)
         digest = payload_digest(spec)
 

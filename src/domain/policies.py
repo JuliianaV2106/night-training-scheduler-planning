@@ -1,5 +1,5 @@
 """
-Submission preconditions (submitJob P2, P5) and night-window time rules.
+Submission preconditions (submitJob P1, P2, P5) and night-window time rules.
 
 Pure functions: every instant is passed in by the caller (ClockPort), never read here.
 """
@@ -16,6 +16,7 @@ from src.domain.entities import JobSpec
 from src.domain.errors import (
     Explanation,
     MaxNightSpanExceeded,
+    OutOfScopeDistributed,
     QueueCapExceeded,
     TwoGpuRequires48Gb,
     ValidationFailed,
@@ -27,6 +28,7 @@ WINDOW_OPEN = time(22, 0, 0)
 ACTIVATION_TOLERANCE_S = 2
 IMAGE_DIGEST_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
 
+RULE_SCOPE = "self:SCOPE-BOUNDARY-v1"
 RULE_JOBSPEC = "self:JOBSPEC-VALIDATION-v1"
 RULE_QUEUE_CAP = "self:QUEUE-DEPTH-CAP-v1"
 RULE_RANKING = "self:ADMISSION-RANKING-v1"
@@ -37,6 +39,27 @@ def payload_digest(spec: JobSpec) -> str:
     """SHA-256 over the canonical (sorted-key, compact) JSON form of the spec."""
     canonical = json.dumps(asdict(spec), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def check_single_node_scope(spec: JobSpec) -> None:
+    """P1: Module 9 only schedules single-node jobs (Story 1.2)."""
+    if spec.worker_count != 1 or spec.replicas != 1 or spec.distributed_artifact_present:
+        raise OutOfScopeDistributed(
+            f"Job submission specifies distributed multi-node execution "
+            f"(worker_count={spec.worker_count}, replicas={spec.replicas}). "
+            f"Module 9 processes single-node jobs only. Route distributed workloads to Module 10.",
+            Explanation(
+                rule_id=RULE_SCOPE,
+                summary="Distributed specification is out of Module 9 scope; route to Module 10.",
+                citations=(RULE_SCOPE,),
+                observed_values={
+                    "worker_count": spec.worker_count,
+                    "replicas": spec.replicas,
+                    "distributed_artifact_present": spec.distributed_artifact_present,
+                },
+                thresholds={"worker_count": 1, "replicas": 1, "distributed_artifact_present": False},
+            ),
+        )
 
 
 def _field_failure(field_name: str, observed: object, constraint: str) -> ValidationFailed:
