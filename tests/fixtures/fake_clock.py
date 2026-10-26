@@ -3,8 +3,7 @@ Mandatory Test Fixture: fake_clock
 Provides deterministic, advanceable time without real sleep (NFR-1, NFR-7).
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 # America/Bogota is UTC-05:00 permanently (no Daylight Saving Time)
 CAMPUS_TZ = timezone(timedelta(hours=-5), name="America/Bogota")

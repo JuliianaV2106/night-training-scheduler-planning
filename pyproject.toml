@@ -1,0 +1,30 @@
+[project]
+name = "night-training-scheduler"
+version = "0.1.0"
+description = "Module 9 — Night Training Scheduler for the Academic AI Compute Fabric (Impl-1)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn==0.34.0",
+    "pydantic==2.10.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "httpx==0.28.1",
+    "ruff==0.8.6",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["planning", "_bmad", "_bmad-output", ".agents", ".claude", ".opencode"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Verbatim Solu-2 contract artifacts: long SQL seed rows and Field descriptions.
+"tests/atdd/*" = ["E501"]
+"src/ports/dto.py" = ["E501"]

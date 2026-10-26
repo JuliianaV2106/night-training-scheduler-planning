@@ -1,0 +1,294 @@
+{
+  "description": "Plan-2 campus fleet: 31 workstations x 1 x 24 GB + 1 server x 2 x 48 GB = 32 nodes / 33 GPU slots",
+  "nodes": [
+    {
+      "node_id": "ws-gpu-01",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-01-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-02",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-02-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-03",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-03-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-04",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-04-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-05",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-05-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-06",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-06-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-07",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-07-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-08",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-08-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-09",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-09-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-10",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-10-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-11",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-11-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-12",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-12-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-13",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-13-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-14",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-14-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-15",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-15-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-16",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-16-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-17",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-17-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-18",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-18-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-19",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-19-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-20",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-20-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-21",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-21-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-22",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-22-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-23",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-23-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-24",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-24-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-25",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-25-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-26",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-26-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-27",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-27-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-28",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-28-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-29",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-29-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-30",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-30-0"
+      ]
+    },
+    {
+      "node_id": "ws-gpu-31",
+      "vram_class_gb": 24,
+      "total_slots": 1,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-ws-31-0"
+      ]
+    },
+    {
+      "node_id": "server-gpu-01",
+      "vram_class_gb": 48,
+      "total_slots": 2,
+      "status": "HEALTHY",
+      "slot_ids": [
+        "slot-srv-01-0",
+        "slot-srv-01-1"
+      ]
+    }
+  ]
+}

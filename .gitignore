@@ -15,3 +15,8 @@ _bmad/
 _bmad-output/
 _progress/
 planning/architecture-gate/
+
+# Local SQLite database
+data/
+.ruff_cache/
+.pytest_cache/

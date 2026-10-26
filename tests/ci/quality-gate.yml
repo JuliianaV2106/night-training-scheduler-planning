@@ -24,7 +24,7 @@ jobs:
       - name: Install Development & Testing Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio hypothesis pydantic pyyaml
+          pip install -r requirements.txt
 
       - name: Step 1 — Domain Purity & AST Architectural Scan
         run: |
@@ -32,7 +32,7 @@ jobs:
           import ast, glob, sys
           forbidden = {'fastapi', 'starlette', 'sqlite3', 'sqlalchemy', 'requests', 'httpx', 'time'}
           violations = []
-          for f in glob.glob('domain/**/*.py', recursive=True):
+          for f in glob.glob('src/domain/**/*.py', recursive=True):
               with open(f, 'r') as fp:
                   tree = ast.parse(fp.read(), filename=f)
               for node in ast.walk(tree):
@@ -54,7 +54,7 @@ jobs:
           python -c "
           import sqlite3
           conn = sqlite3.connect(':memory:')
-          with open('planning/detailed-design/schemas/001_night_training_scheduler_schema.sql') as f:
+          with open('migrations/001_night_training_scheduler_schema.sql') as f:
               conn.executescript(f.read())
           cur = conn.cursor()
           cur.execute('SELECT COUNT(*) FROM nodes')
@@ -64,8 +64,8 @@ jobs:
           print('DDL Schema syntax and seed fleet migration PASSED.')
           "
 
-      - name: Step 3 — Run ATDD Red-Phase Suite (Certified Red Verification)
+      - name: Step 3 — Run Test Suite and Lint (Impl-1 DoD)
         run: |
-          # The suite must execute and verify that tests fail for the right reason (NotImplementedError)
-          pytest test/atdd/night_training_scheduler_contracts_test.py || true
-          echo "ATDD Red-Phase suite execution verified."
+          ruff check src tests
+          pytest -v
+          echo "Impl-1 Definition of Done verified."

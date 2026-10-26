@@ -1,0 +1,9 @@
+.venv
+.git
+data
+_bmad
+_bmad-output
+.agents
+.claude
+.opencode
+**/__pycache__

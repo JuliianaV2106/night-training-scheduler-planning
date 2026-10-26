@@ -3,16 +3,15 @@ Mandatory Test Fixture: sim_telemetry
 Scripted GPU, heartbeat, and fault injector for deterministic failure testing.
 """
 
-from typing import Dict, Set, Optional
 
 
 class SimTelemetry:
     """Scriptable fault generator for testing edge cases and failures."""
 
     def __init__(self):
-        self._failing_nodes: Set[str] = set()
-        self._checkpoint_write_faults: Set[str] = set()
-        self._checkpoint_delays_s: Dict[str, int] = {}
+        self._failing_nodes: set[str] = set()
+        self._checkpoint_write_faults: set[str] = set()
+        self._checkpoint_delays_s: dict[str, int] = {}
 
     def inject_node_fault(self, node_id: str) -> None:
         """Simulates node hardware failure or unreachability."""
