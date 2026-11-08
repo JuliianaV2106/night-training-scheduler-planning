@@ -1,0 +1,25 @@
+services:
+  scheduler:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_PATH: /data/scheduler.db
+    volumes:
+      - scheduler-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  tests:
+    build: .
+    profiles: ["test"]
+    command: ["pytest", "-v"]
+
+volumes:
+  scheduler-data:

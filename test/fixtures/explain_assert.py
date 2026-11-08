@@ -4,13 +4,13 @@ Helper that asserts a decision record or explanation carries >= 1 rule ID,
 non-empty citations, and observed values.
 """
 
-from typing import Any, Dict, List, Union
+from typing import Any
 
 
 def assert_explainability(
-    record: Union[Dict[str, Any], Any],
+    record: dict[str, Any] | Any,
     expected_rule_id: str,
-    required_keys: List[str] = None
+    required_keys: list[str] = None
 ) -> None:
     """
     Asserts that a decision record satisfies explainability criteria (AD-3, PRD §6.1).

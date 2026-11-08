@@ -1,0 +1,362 @@
+openapi: 3.0.3
+info:
+  title: University AI Compute Fabric — Module 9: Night Training Scheduler API
+  description: Machine-enforceable contract for single-node night training scheduling, automated deterministic window activation, and dawn eviction.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local standalone container / dev instance
+
+paths:
+  /jobs:
+    post:
+      summary: Submit Training Job (Operation 1 - submitJob)
+      operationId: submitJob
+      description: Submits a single-node training job for evaluation and placement into night windows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobSubmissionRequest'
+      responses:
+        '201':
+          description: Job successfully validated and admitted into QUEUED_PENDING_WINDOW.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobSubmissionResponse'
+        '200':
+          description: Idempotent resubmission with identical payload digest returns existing job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobSubmissionResponse'
+        '400':
+          description: Out of scope distributed job specification (worker_count > 1).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '404':
+          description: Access denied or actor lacks valid course entitlement (AD-8 anti-enumeration).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '409':
+          description: Idempotency conflict (same key with differing payload digest).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '422':
+          description: Job specification validation failure (VRAM, limits, checkpoint interval, duration).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '429':
+          description: Active queue depth cap of 500 non-terminal jobs exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '503':
+          description: Delegated fixture (M1, M2, M5, M8) unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '507':
+          description: Checkpoint store storage budget exhausted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /window/activate:
+    post:
+      summary: Trigger Window Activation (Operation 2 - activateWindow)
+      operationId: activateWindow
+      description: Drains pending queue, computes deterministic Admission Order, and allocates 33 GPU slots at 22:00:00.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WindowActivationRequest'
+      responses:
+        '200':
+          description: Window activation completed and slot allocations committed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WindowActivationResult'
+        '400':
+          description: Activation triggered outside valid simulated instant 22:00:00.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '503':
+          description: Delegated hardware/fleet fixture unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /eviction/execute:
+    post:
+      summary: Execute Dawn Eviction Ramp & Deadline (Operation 3 - evictAtDeadline)
+      operationId: evictAtDeadline
+      description: Manages 05:45:00 SIGTERM checkpoint ramp and 05:53:00 SIGKILL deadline enforcement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvictionRequest'
+      responses:
+        '200':
+          description: Eviction processed, slots released, and node state updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvictionResult'
+        '400':
+          description: Eviction called prior to 05:45:00 ramp threshold.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '409':
+          description: Target job not in RUNNING or CHECKPOINTING state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '500':
+          description: Mandatory edge case triggered (checkpoint deadline missed; node cordoned).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /health:
+    get:
+      summary: Process Health and Pacer Progress
+      operationId: getHealth
+      description: Reports process liveness, single writer task status, and simulation pacer progress.
+      responses:
+        '200':
+          description: Service healthy and pacer active.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, sim_instant, pacer_rate]
+                properties:
+                  status: { type: string, example: "HEALTHY" }
+                  sim_instant: { type: string, example: "2026-10-18T22:00:00-05:00" }
+                  pacer_rate: { type: integer, example: 1 }
+
+components:
+  schemas:
+    JobSpec:
+      type: object
+      required:
+        - image_digest
+        - gpu_slots_requested
+        - required_vram_gb
+        - checkpoint_interval_minutes
+        - estimated_duration_s
+        - model_id
+        - model_version
+        - storage_request_bytes
+        - worker_count
+        - replicas
+        - distributed_artifact_present
+      properties:
+        image_digest:
+          type: string
+          pattern: '^sha256:[a-f0-9]{64}$'
+        gpu_slots_requested:
+          type: integer
+          enum: [1, 2]
+        required_vram_gb:
+          type: integer
+          enum: [24, 48]
+        checkpoint_interval_minutes:
+          type: integer
+          minimum: 1
+          maximum: 30
+        estimated_duration_s:
+          type: integer
+          minimum: 60
+          maximum: 139500
+        model_id:
+          type: string
+        model_version:
+          type: string
+        storage_request_bytes:
+          type: integer
+          minimum: 1
+        worker_count:
+          type: integer
+          enum: [1]
+        replicas:
+          type: integer
+          enum: [1]
+        distributed_artifact_present:
+          type: boolean
+          enum: [false]
+
+    JobSubmissionRequest:
+      type: object
+      required:
+        - idempotency_key
+        - actor_id
+        - spec
+      properties:
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 64
+        actor_id:
+          type: string
+        spec:
+          $ref: '#/components/schemas/JobSpec'
+
+    JobSubmissionResponse:
+      type: object
+      required:
+        - job_id
+        - state
+        - idempotency_key
+        - payload_digest
+        - admitted_at
+        - queue_position
+        - estimated_first_window
+      properties:
+        job_id:
+          type: string
+          pattern: '^JOB-[0-9]{4}$'
+        state:
+          type: string
+          enum: [QUEUED_PENDING_WINDOW]
+        idempotency_key:
+          type: string
+        payload_digest:
+          type: string
+        admitted_at:
+          type: string
+        queue_position:
+          type: integer
+        estimated_first_window:
+          type: string
+
+    WindowActivationRequest:
+      type: object
+      required:
+        - sim_instant
+      properties:
+        sim_instant:
+          type: string
+
+    Placement:
+      type: object
+      required:
+        - job_id
+        - node_id
+        - slot_ids
+        - vram_class_gb
+        - transition
+        - decision_id
+      properties:
+        job_id: { type: string }
+        node_id: { type: string }
+        slot_ids: { type: array, items: { type: string } }
+        vram_class_gb: { type: integer, enum: [24, 48] }
+        transition: { type: string, enum: [T-3, T-12] }
+        decision_id: { type: string }
+
+    WindowActivationResult:
+      type: object
+      required:
+        - activation_id
+        - sim_instant
+        - total_evaluated
+        - admitted_count
+        - deferred_count
+        - placements
+      properties:
+        activation_id: { type: string }
+        sim_instant: { type: string }
+        total_evaluated: { type: integer }
+        admitted_count: { type: integer }
+        deferred_count: { type: integer }
+        placements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Placement'
+
+    EvictionRequest:
+      type: object
+      required:
+        - sim_instant
+      properties:
+        sim_instant: { type: string }
+        job_id: { type: string, nullable: true }
+
+    EvictionResult:
+      type: object
+      required:
+        - job_id
+        - node_id
+        - checkpoint_status
+        - slots_released
+        - cordon_requested
+        - final_job_state
+        - decision_id
+        - allocations_held_after
+      properties:
+        job_id: { type: string }
+        node_id: { type: string }
+        checkpoint_id: { type: string, nullable: true }
+        checkpoint_status: { type: string, enum: [VERIFIED, FAILED] }
+        slots_released: { type: integer, enum: [1, 2] }
+        cordon_requested: { type: boolean }
+        final_job_state: { type: string, enum: [EVICTED_RESUMABLE, EVICTION_FAILED] }
+        decision_id: { type: string }
+        allocations_held_after: { type: integer, minimum: 0 }
+
+    Explanation:
+      type: object
+      required:
+        - rule_id
+        - summary
+        - citations
+      properties:
+        rule_id: { type: string }
+        summary: { type: string }
+        observed_values: { type: object }
+        thresholds: { type: object }
+        citations: { type: array, items: { type: string } }
+
+    ErrorBody:
+      type: object
+      required:
+        - error_code
+        - message
+        - http_status
+        - retryable
+        - occurred_at
+      properties:
+        error_code: { type: string }
+        message: { type: string }
+        http_status: { type: integer }
+        retryable: { type: boolean }
+        occurred_at: { type: string }
+        explanation:
+          $ref: '#/components/schemas/Explanation'
