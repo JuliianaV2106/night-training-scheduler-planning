@@ -82,6 +82,9 @@ class JobSubmissionResponseDTO(BaseModel):
     admitted_at: str = Field(..., description="ISO-8601 timestamp with America/Bogota -05:00 offset")
     queue_position: int = Field(..., ge=1, le=500, description="1-based position in admission queue")
     estimated_first_window: str = Field(..., description="Estimated window date string (YYYY-MM-DD)")
+    citations: List[str] = Field(default_factory=list, description="Cited validation and policy rule URNs")
+    inputs: Dict[str, Any] = Field(default_factory=dict, description="Observed input parameters for explainability")
+    explanation: Optional[ExplanationDTO] = Field(None, description="Full explainability record")
 
 
 # =============================================================================
@@ -111,6 +114,9 @@ class WindowActivationResultDTO(BaseModel):
     admitted_count: int = Field(..., ge=0, description="Number of jobs placed into slots")
     deferred_count: int = Field(..., ge=0, description="Number of jobs deferred due to capacity or eligibility")
     placements: List[PlacementDTO] = Field(default_factory=list, description="List of successful job placements")
+    citations: List[str] = Field(default_factory=list, description="Cited policy and ranking rules")
+    inputs: Dict[str, Any] = Field(default_factory=dict, description="Observed evaluation summary inputs")
+    explanation: Optional[ExplanationDTO] = Field(None, description="Full explainability record")
 
 
 # =============================================================================
@@ -131,6 +137,9 @@ class EvictionResultDTO(BaseModel):
     checkpoint_status: Literal["VERIFIED", "FAILED"] = Field(..., description="Outcome of checkpoint protocol")
     slots_released: int = Field(..., ge=1, le=2, description="Number of GPU slots released back to fleet")
     cordon_requested: bool = Field(..., description="Whether a CordonRequest was issued to Module 3")
-    final_job_state: Literal["EVICTED_RESUMABLE", "EVICTION_FAILED"] = Field(..., description="State post-eviction")
+    final_job_state: Literal["EVICTED_RESUMABLE", "EVICTION_FAILED", "EVICTED_FORCEFULLY"] = Field(..., description="State post-eviction")
     decision_id: str = Field(..., description="Associated DecisionRecord ID")
     allocations_held_after: int = Field(..., ge=0, description="Remaining allocations held on this node (must be 0 at 06:00:00)")
+    citations: List[str] = Field(default_factory=list, description="Cited day-reclaim policy rules")
+    inputs: Dict[str, Any] = Field(default_factory=dict, description="Observed eviction inputs")
+    explanation: Optional[ExplanationDTO] = Field(None, description="Full explainability record")

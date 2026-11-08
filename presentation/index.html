@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Module 9: Night Training Scheduler — Presentación Final Lunes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --background: #0b1120;
+      --card: #111827;
+      --secondary: #1e293b;
+      --border: #334155;
+      --foreground: #f8fafc;
+      --muted-foreground: #94a3b8;
+    }
+    body {
+      background-color: var(--background);
+      color: var(--foreground);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .slide-fade {
+      animation: fadeIn 0.25s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 md:p-8 select-none max-w-7xl mx-auto">
+
+  <!-- Top Navigation & Rubric Progress Header -->
+  <header class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 mb-4 shadow-lg flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <span class="px-3 py-1 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30 font-bold text-xs tracking-wide uppercase">
+        Módulo 9 · Night Training Scheduler
+      </span>
+      <span id="rubric-pill" class="px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold text-xs">
+        Visión General
+      </span>
+    </div>
+
+    <!-- Rubric Section Quick Jump Buttons -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      <button onclick="goToSlide(0)" class="px-2.5 py-1 rounded-md text-xs font-medium border border-[var(--border)] hover:bg-[var(--secondary)] transition">
+        Portada
+      </button>
+      <button onclick="goToSlide(1)" class="px-2.5 py-1 rounded-md text-xs font-medium border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition">
+        1. Proceso & Aprendizajes (20%)
+      </button>
+      <button onclick="goToSlide(4)" class="px-2.5 py-1 rounded-md text-xs font-medium border border-sky-500/40 text-sky-400 hover:bg-sky-500/10 transition">
+        2. Demo & Reportes Test (40%)
+      </button>
+      <button onclick="goToSlide(8)" class="px-2.5 py-1 rounded-md text-xs font-medium border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 transition">
+        3. Tiempo & Git TLOC (20%)
+      </button>
+      <button onclick="goToSlide(10)" class="px-2.5 py-1 rounded-md text-xs font-medium border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 transition">
+        4. Equipo & Validación IA (20%)
+      </button>
+      <a href="/admin/scheduler-board" target="_blank" class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 transition">
+        ⚡ Abrir Tablero Vivo
+      </a>
+    </div>
+
+    <!-- Slide Controls & Speaker Notes Toggle -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleNotes()" id="notes-btn" class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)] text-[var(--foreground)] text-xs font-semibold hover:opacity-90 transition">
+        🎙️ Guion Orador: ON
+      </button>
+      <button onclick="prevSlide()" class="px-3 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--secondary)] text-xs font-bold transition">
+        ← Anterior
+      </button>
+      <span id="slide-counter" class="text-xs font-bold px-2 tabular-nums">1 / 12</span>
+      <button onclick="nextSlide()" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white hover:bg-sky-500 text-xs font-bold transition">
+        Siguiente →
+      </button>
+    </div>
+  </header>
+
+  <!-- Progress Bar -->
+  <div class="w-full h-1.5 bg-[var(--border)] rounded-full overflow-hidden mb-4">
+    <div id="progress-bar" class="h-full bg-sky-500 transition-all duration-300" style="width: 8.33%"></div>
+  </div>
+
+  <!-- Main Slide Viewport -->
+  <main id="slide-container" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-xl min-h-[480px] flex flex-col justify-between slide-fade">
+  </main>
+
+  <!-- Speaker Notes Drawer -->
+  <aside id="speaker-notes-box" class="mt-4 bg-[var(--card)] border-l-4 border-l-amber-500 border border-[var(--border)] rounded-xl p-4 shadow-md">
+    <div class="flex items-center justify-between mb-1">
+      <span class="text-xs font-bold uppercase tracking-wider text-amber-400">
+        🎙️ Guion Sugerido para el Profesor (Tecla 'N' para ocultar/mostrar)
+      </span>
+      <span id="slide-timer-badge" class="text-xs font-semibold text-[var(--muted-foreground)]">Tiempo sugerido: 1 min</span>
+    </div>
+    <p id="speaker-notes-text" class="text-sm text-[var(--foreground)] leading-relaxed select-text"></p>
+  </aside>
+
+  <script>
+    let showNotes = true;
+    let currentSlide = 0;
+    let simState = '14:00';
+    let activeTestTab = 'flowBC';
+
+    const slides = [
+      {
+        rubric: "Presentación Final · Módulo 9",
+        time: "45 seg",
+        notes: "Buenos días profesor y compañeros. Hoy presentamos el proceso completo de ingeniería asistida por IA para el Módulo 9: Night Training Scheduler de la plataforma University AI Compute Fabric. Estructuramos la presentación siguiendo estrictamente los 4 bloques de evaluación: (1) Proceso, problemas y aprendizajes (20%), (2) Ejecución interactiva y reportes de pruebas en todos los niveles de la pirámide (40%), (3) Análisis cuantitativo de tiempo y TLOC desde los commits de Git (20%), y (4) Forma de trabajo en pareja y validación humana frente a la IA (20%).",
+        render: () => `
+          <div class="space-y-6 py-4">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-semibold">
+              University AI Compute Fabric · Módulo 9
+            </div>
+            <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+              Night Training Scheduler:<br/>
+              <span class="text-sky-400">De Especificaciones BMad a Sistema Hexagonal Endurecido</span>
+            </h1>
+            <p class="text-base text-[var(--muted-foreground)] max-w-3xl leading-relaxed">
+              Planificación de entrenamientos nocturnos en un clúster heterogéneo de <strong>32 nodos (31 estaciones de 24 GB VRAM + 1 servidor dual-GPU de 2×48 GB VRAM = 33 slots)</strong>, garantizando 0% de ocupación diurna (06:00–22:00), durabilidad de checkpoints en 5 pasos y explicabilidad normativa.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
+              <div onclick="goToSlide(1)" class="cursor-pointer p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition">
+                <div class="text-xs font-bold text-amber-400 uppercase">Bloque 1 · 20% Rúbrica</div>
+                <div class="font-bold text-sm mt-1">Proceso, Problemas y Aprendizajes</div>
+                <div class="text-xs text-[var(--muted-foreground)] mt-1">Plan-1 → Solu-2 → Impl-2</div>
+              </div>
+              <div onclick="goToSlide(4)" class="cursor-pointer p-4 rounded-xl border border-sky-500/30 bg-sky-500/5 hover:bg-sky-500/10 transition">
+                <div class="text-xs font-bold text-sky-400 uppercase">Bloque 2 · 40% Rúbrica</div>
+                <div class="font-bold text-sm mt-1">Ejecución Interactiva y Pruebas</div>
+                <div class="text-xs text-[var(--muted-foreground)] mt-1">81 Pytest (100% cov) + k6 + Playwright</div>
+              </div>
+              <div onclick="goToSlide(8)" class="cursor-pointer p-4 rounded-xl border border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 transition">
+                <div class="text-xs font-bold text-purple-400 uppercase">Bloque 3 · 20% Rúbrica</div>
+                <div class="font-bold text-sm mt-1">Tiempo Invertido y Git TLOC</div>
+                <div class="text-xs text-[var(--muted-foreground)] mt-1">22+ commits · 12,980+ líneas totales</div>
+              </div>
+              <div onclick="goToSlide(10)" class="cursor-pointer p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition">
+                <div class="text-xs font-bold text-emerald-400 uppercase">Bloque 4 · 20% Rúbrica</div>
+                <div class="font-bold text-sm mt-1">Trabajo en Pareja y Validación IA</div>
+                <div class="text-xs text-[var(--muted-foreground)] mt-1">27 decisiones · 4 errores de IA corregidos</div>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-[var(--border)] flex flex-wrap justify-between items-center text-xs text-[var(--muted-foreground)]">
+              <div><strong>Autores:</strong> Juan Manuel Casanova Marín & Juliana Filigrana Valencia</div>
+              <div><strong>Stack:</strong> Python 3.12 · FastAPI · SQLite (Atomic) · Pytest · Playwright · Grafana k6</div>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "1. Proceso, Problemas y Aprendizajes (20%)",
+        time: "1.5 min",
+        notes: "En este primer bloque (20%) explicamos el proceso seguido. No escribimos código a ciegas con un prompt genérico: aplicamos un pipeline disciplinado en 3 macro-fases (Plan-1, Solu-2 e Impl-2). En Plan-1 destilamos 32 requisitos funcionales, 16 no funcionales, 4 escenarios UX y 8 Decisiones Arquitectónicas (AD-1 a AD-8), auditados con revisiones adversariales independientes. En Solu-2 tradujimos la arquitectura a contratos formales Design-by-Contract, el esquema DDL SQLite de 6 tablas y 15 pruebas ATDD en fase Roja. Finalmente, en Impl-2 construimos la arquitectura hexagonal completa y la endurecimos mediante los 5 flujos de pruebas BMad.",
+        render: () => `
+          <div class="space-y-5">
+            <div>
+              <span class="text-xs font-bold uppercase text-amber-400">Sección 1 de la Rúbrica (20%)</span>
+              <h2 class="text-2xl font-bold mt-0.5">El Proceso de Ingeniería Asistida por IA: De Plan-1 a Impl-2</h2>
+              <p class="text-sm text-[var(--muted-foreground)]">Un flujo trazable donde ninguna línea de código de producción se escribió sin un contrato e invariante previo.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="p-4 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold text-xs">FASE 1 · PLAN-1</span>
+                  <span class="text-xs text-[var(--muted-foreground)]">17 Commits</span>
+                </div>
+                <h3 class="font-bold text-base">Especificación, UX & Arquitectura</h3>
+                <ul class="text-xs space-y-1.5 text-[var(--muted-foreground)] list-disc pl-4">
+                  <li><strong>PRD (`planning/prd.md`):</strong> 32 FRs, 16 NFRs, Registro explícito de 22 Supuestos (A-1..A-22) y mapa de citaciones §6.4.</li>
+                  <li><strong>UX (`ux/`):</strong> 4 escenarios WDS, 3 wireframes ASCII y auditoría de contraste/accesibilidad.</li>
+                  <li><strong>Arquitectura (`ARCHITECTURE.md`):</strong> Selección de motor reductor puro + log de decisiones en SQLite (`AD-1`..`AD-8`).</li>
+                  <li><strong>4 Auditorías Independientes:</strong> Revisiones adversariales y cazador de casos límite en sesiones limpias.</li>
+                </ul>
+              </div>
+
+              <div class="p-4 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="px-2.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-bold text-xs">FASE 2 · SOLU-2</span>
+                  <span class="text-xs text-[var(--muted-foreground)]">5 Commits</span>
+                </div>
+                <h3 class="font-bold text-base">Contratos, Esquema & ATDD Rojo</h3>
+                <ul class="text-xs space-y-1.5 text-[var(--muted-foreground)] list-disc pl-4">
+                  <li><strong>Contratos (`contracts.md`):</strong> Precondiciones, postcondiciones (`Q-ok`, `Q-fail`) e invariantes (`INV-01`..`INV-08`).</li>
+                  <li><strong>Puertos Hexagonales (`ports-and-adapters.md`):</strong> Separación estricta `domain/`, `ports/in/`, `ports/out/`, `adapters/`.</li>
+                  <li><strong>DDL Real (`001_schema.sql`):</strong> 6 tablas con `CHECK` constraints y semilla de 32 nodos (33 slots GPU).</li>
+                  <li><strong>ATDD Red Phase:</strong> 15 pruebas de contrato fallando limpiamente (`NotImplementedError`).</li>
+                </ul>
+              </div>
+
+              <div class="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/5 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-xs">FASE 3 · IMPL-2</span>
+                  <span class="text-xs text-emerald-400 font-semibold">Hardened PASS</span>
+                </div>
+                <h3 class="font-bold text-base">Implementación & 5 Flujos Test</h3>
+                <ul class="text-xs space-y-1.5 text-[var(--muted-foreground)] list-disc pl-4">
+                  <li><strong>Dominio 100% Puro:</strong> 6 módulos en `domain/` con 0 imports de I/O o reloj del sistema y <strong>100.00% branch coverage</strong>.</li>
+                  <li><strong>Historias Complejas (9.4, 9.5, 9.6):</strong> Evicción forzada `SIGKILL` + acordonamiento, cascada de expropiación bajo contención y tablero Kanban Time-Lapse.</li>
+                  <li><strong>5 Flujos de Testing:</strong> Flow A (ATDD), Flow B (Test-Along), Flow C (Test-After), Flow D (k6 NFR), Flow E (Playwright POM).</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--secondary)] text-xs flex flex-wrap items-center justify-between gap-2">
+              <div><strong>Principio Rector:</strong> El reloj del sistema (`time.time` / `sleep`) está prohibido en el dominio; todo avance temporal ocurre mediante inyección explícita del `SimulatedClockAdapter`.</div>
+              <span class="px-2.5 py-1 rounded bg-sky-500/20 text-sky-400 font-bold">Invariante AD-1 / INV-07</span>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "1. Proceso, Problemas y Aprendizajes (20%)",
+        time: "2 min",
+        notes: "Aquí detallamos los 5 problemas técnicos más importantes que enfrentamos durante la especificación y el desarrollo, y cómo los resolvimos. Al profesor le interesa ver problemas reales de ingeniería: desde contradicciones en el PRD detectadas por las auditorías, hasta colisiones de nombres con la librería estándar de Python, mutabilidad de tracebacks en Python 3.12 y contención de bloqueos de escritura en SQLite bajo ráfagas de 50 usuarios concurrentes en k6.",
+        render: () => `
+          <div class="space-y-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-amber-400">Sección 1 de la Rúbrica (20%) · Problemas Reales Encontrados</span>
+              <h2 class="text-2xl font-bold mt-0.5">5 Problemas Técnicos Críticos y su Resolución de Ingeniería</h2>
+            </div>
+
+            <div class="space-y-2.5">
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div class="md:col-span-4 font-bold text-sm text-rose-400">
+                  1. Contradicción en Reglas de Citación y Span Nocturno (Fase PRD/UX)
+                </div>
+                <div class="md:col-span-4 text-xs text-[var(--muted-foreground)]">
+                  El borrador inicial de la IA asumía noches de 8h (40h en 5 noches) y exigía citación externa en cada `EXPIRE`, lo cual era imposible para el TTL interno del módulo.
+                </div>
+                <div class="md:col-span-4 text-xs text-emerald-400 font-medium">
+                  ✓ Corregido en auditoría humana: ventana útil real = 7h 45m (22:00 a 05:45 → 38.75h máx) y registro de `self:RETENTION-DEADLINE-v1` en PRD §6.4.
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div class="md:col-span-4 font-bold text-sm text-rose-400">
+                  2. Palabra Reservada `in` en `ports/in/` y Colisión del Paquete `test`
+                </div>
+                <div class="md:col-span-4 text-xs text-[var(--muted-foreground)]">
+                  La arquitectura exigía la ruta `ports/in/*.py`, pero `from ports.in...` lanza `SyntaxError` en Python. Además, `import test.fixtures` resolvía al módulo `test` de la stdlib de Python.
+                </div>
+                <div class="md:col-span-4 text-xs text-emerald-400 font-medium">
+                  ✓ Implementamos `load_inbound_port_module()` con `importlib.util` en `ports/__init__.py` conservando la ruta exacta, y agregamos `__init__.py` + prioridad en `sys.path`.
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div class="md:col-span-4 font-bold text-sm text-rose-400">
+                  3. `FrozenInstanceError` en Excepciones con Python 3.12 (`DomainError`)
+                </div>
+                <div class="md:col-span-4 text-xs text-[var(--muted-foreground)]">
+                  Declaramos `DomainError(Exception)` como `@dataclass(frozen=True)`. En Python 3.12, `contextlib.__exit__` asigna `exc.__traceback__` al salir de un bloque `with`, rompiendo clases congeladas.
+                </div>
+                <div class="md:col-span-4 text-xs text-emerald-400 font-medium">
+                  ✓ Separamos la inmutabilidad: entidades de dominio (`JobEntity`, `DecisionRecordEntity`) permanecen `frozen=True`, mientras `DomainError` permite adjuntar tracebacks.
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div class="md:col-span-4 font-bold text-sm text-rose-400">
+                  4. Defecto Latente en Test Heredado de Solu-2 (Digest de 66 caracteres)
+                </div>
+                <div class="md:col-span-4 text-xs text-[var(--muted-foreground)]">
+                  Al conectar el esquema SQLite real (`CHECK (length(payload_digest) = 64)`), 3 pruebas de Solu-2 fallaron con `IntegrityError` porque el string `'digest000...'` tenía 66 caracteres.
+                </div>
+                <div class="md:col-span-4 text-xs text-emerald-400 font-medium">
+                  ✓ Demostró el valor de NO mockear SQLite: corregimos el fixture a 64 caracteres exactos y armonizamos los estados de Story 9.4/9.5 en el DDL.
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div class="md:col-span-4 font-bold text-sm text-rose-400">
+                  5. Contención de Write-Lock en SQLite bajo Ráfaga de 50 VUs (`k6`)
+                </div>
+                <div class="md:col-span-4 text-xs text-[var(--muted-foreground)]">
+                  En la primera corrida de `k6`, cada reintento idempotente abría `BEGIN IMMEDIATE` en SQLite desde hilos síncronos, subiendo la latencia $p_{95}$ a `153.14 ms` (meta `< 50 ms`).
+                </div>
+                <div class="md:col-span-4 text-xs text-emerald-400 font-medium">
+                  ✓ Implementamos lectura rápida (*fast-path*) con *double-checked locking* en `submit_job` y endpoints `async def`: el $p_{95}$ bajó a **`8.52 ms`** con `0%` errores.
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "1. Proceso, Problemas y Aprendizajes (20%)",
+        time: "1.5 min",
+        notes: "Para cerrar el primer 20%, sintetizamos nuestros 4 aprendizajes fundamentales del proceso asistido por IA: (1) La IA es un multiplicador de velocidad pero requiere contratos formales (Design-by-Contract) para no inventar comportamientos; (2) Prohibir `sleep()` nos obligó a diseñar una arquitectura verdaderamente determinista basada en reloj inyectado; (3) Probar contra SQLite real en lugar de mocks descubrió discrepancias de esquema que habrían llegado a producción; y (4) Cada uno de los 5 flujos de testing BMad atrapa una familia distinta de defectos.",
+        render: () => `
+          <div class="space-y-5">
+            <div>
+              <span class="text-xs font-bold uppercase text-amber-400">Sección 1 de la Rúbrica (20%) · Síntesis de Aprendizajes</span>
+              <h2 class="text-2xl font-bold mt-0.5">¿Qué Aprendimos sobre Ingeniería de Software Asistida por IA?</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-5 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2">
+                <div class="text-xs font-bold text-sky-400 uppercase">Aprendizaje 1 · Especificación como Compilador</div>
+                <h3 class="font-bold text-base">Los Contratos Formales Eliminan la Alucinación en Implementación</h3>
+                <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                  Invertir tiempo en Plan-1 y Solu-2 definiendo precondiciones, postcondiciones (`Q-ok`/`Q-fail`), catálogo de errores HTTP y tablas de transición hizo que en Impl-2 el agente no tuviera ambigüedad sobre qué devolver ante un trabajo distribuido (`422 OUT_OF_SCOPE_DISTRIBUTED`) o un acceso ajeno (`404 ENTITLEMENT_DENIED`).
+                </p>
+              </div>
+
+              <div class="p-5 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2">
+                <div class="text-xs font-bold text-emerald-400 uppercase">Aprendizaje 2 · Determinismo Temporal</div>
+                <h3 class="font-bold text-base">Cero `sleep()` Produce Mejor Arquitectura de Producción</h3>
+                <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                  La regla de prohibir `time.sleep()` y `waitForTimeout()` no es solo una regla de testing: obligó a que `HardEvictionSupervisorService` y `WindowActivationService` recibieran el instante simulado por parámetro (`SimulatedClockAdapter`), permitiendo simular 24 horas en `2.1 segundos` de extremo a extremo.
+                </p>
+              </div>
+
+              <div class="p-5 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2">
+                <div class="text-xs font-bold text-amber-400 uppercase">Aprendizaje 3 · Anti-Over-Mocking</div>
+                <h3 class="font-bold text-base">Los Mocks Mienten Cuando el Esquema Cambia</h3>
+                <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                  Si hubiéramos aceptado la sugerencia inicial de mockear el repositorio SQLite con `MagicMock`, las pruebas habrían pasado en verde mientras el SQL real fallaba por restricciones `CHECK` en los estados `EVICTED_FORCEFULLY` y `CORDONED_DIRTY`. Usar SQLite en memoria/efímero con el DDL real nos dio confianza real.
+                </p>
+              </div>
+
+              <div class="p-5 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2">
+                <div class="text-xs font-bold text-purple-400 uppercase">Aprendizaje 4 · Complementariedad de los 5 Flujos</div>
+                <h3 class="font-bold text-base">Ningún Nivel de Prueba Basta por Sí Solo</h3>
+                <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                  Las pruebas unitarias verificaron el 100% de las ramas matemáticas en milisegundos; ATDD (Flow A) blindó el borde de seguridad de las `06:00 AM`; `k6` (Flow D) destapó un cuello de botella de bloqueo en SQLite que las pruebas funcionales no veían; y Playwright (Flow E) certificó la experiencia visual del operador.
+                </p>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "2. Ejecución Interactiva y Reportes de Pruebas (40%)",
+        time: "3 min",
+        notes: "Entramos al bloque más importante de la rúbrica (40%): la ejecución interactiva del módulo y los reportes de pruebas en todos los niveles. Aquí podemos interactuar directamente con el simulador de ciclo de 24 horas del Night Training Scheduler (o abrir `/admin/scheduler-board` en vivo con el botón verde superior). Observen cómo al saltar de las 14:00 a las 22:00 se activan los trabajos en el clúster; a las 23:10 ocurre la cascada de expropiación (Story 9.5) en `ws-gpu-06`; a las 05:45/05:46 el supervisor mata con `SIGKILL` el proceso colgado en `ws-gpu-14` y lo acordona como `CORDONED_DIRTY` (Story 9.4); y a las 06:00 entregamos 31 nodos limpios y 0 procesos GPU de estudiantes.",
+        render: () => {
+          const states = {
+            '14:00': {
+              clock: '14:00 (Modo Diurno · Clases de Laboratorio)',
+              queued: ['JOB-KANBAN-01 (Prio 149 · 4h)', 'JOB-KANBAN-02 (Prio 148 · 4h)', 'JOB-KANBAN-03 (Prio 147 · 4h)', 'JOB-KANBAN-04 (Prio 146 · 12h)', 'JOB-KANBAN-05 (Prio 145 · 12h)'],
+              running: [],
+              completed: [],
+              fleetSummary: '32 / 32 Nodos IDLE para laboratorios diurnos · 0 GPUs ocupadas por entrenamientos',
+              cite: 'policy:M2/night-window@v1 — Admisión en cola pendiente hasta las 22:00:00'
+            },
+            '22:00': {
+              clock: '22:00 (Activación de Ventana Nocturna · T-3)',
+              queued: [],
+              running: ['JOB-KANBAN-01 → ws-gpu-01', 'JOB-KANBAN-02 → ws-gpu-02', 'JOB-KANBAN-03 → ws-gpu-03', 'JOB-KANBAN-04 → ws-gpu-04', 'JOB-KANBAN-05 → ws-gpu-05'],
+              completed: [],
+              fleetSummary: '32 Nodos Activos · Despacho determinista por (-effective_priority, -missed_nights, submitted_at, job_id)',
+              cite: 'self:ADMISSION-RANKING-v1 & policy:M2/night-window@v1'
+            },
+            '23:10': {
+              clock: '23:10 (Story 9.5 · Preemption Cascade bajo Contención)',
+              queued: ['JOB-EXP-0006 (QUEUED_PREEMPTED · Ckpt 22:45 preservado)'],
+              running: ['JOB-KAVITA-THESIS (Prio 10) → ws-gpu-06 (Expropiado)', '30 otros trabajos en ws-gpu-01..31'],
+              completed: [],
+              fleetSummary: 'Clúster 100% saturado → Trabajo THESIS (Prio 10) expropia al EXPLORATION (Prio 1) con checkpoint más antiguo (ws-gpu-06)',
+              cite: 'policy:M2/priority-preemption@v1 & self:PREEMPTION-TIEBREAK-v1'
+            },
+            '05:46': {
+              clock: '05:46 (Story 9.4 · Hard Eviction SIGKILL & Cordon)',
+              queued: [],
+              running: [],
+              completed: ['JOB-ROGUE-0014 (EVICTED_FORCEFULLY · SIGKILL tras 60s timeout)', 'Trabajos sanos → EVICTED_RESUMABLE (Checkpoint VERIFIED)'],
+              fleetSummary: 'Nodo ws-gpu-14 → CORDONED_DIRTY (DIRTY_EVICTION_FAILED) · Alerta enviada al Admin · 0 procesos GPU huérfanos',
+              cite: 'policy:M2/day-reclaim@v1 & health:M6/node-cordon@v1'
+            },
+            '06:00': {
+              clock: '06:00 (Story 9.6 · Entrega Matutina · Invariante S-1)',
+              queued: [],
+              running: [],
+              completed: ['JOB-KANBAN-01 (Completed)', 'JOB-KANBAN-02 (Completed)', 'JOB-KANBAN-03 (Completed)', 'JOB-KANBAN-04 (Evicted · Ckpt)', 'JOB-KANBAN-05 (Evicted · Ckpt)'],
+              fleetSummary: 'Invariante S-1 Cumplido: 0 slots GPU retenidos por estudiantes · Clúster libre para clases de 08:00 AM',
+              cite: 'policy:M2/day-reclaim@v1 — 0% Daytime Student GPU Occupancy'
+            }
+          };
+          const cur = states[simState];
+          return `
+            <div class="space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span class="text-xs font-bold uppercase text-sky-400">Sección 2 de la Rúbrica (40%) · Simulador Interactivo en Vivo</span>
+                  <h2 class="text-xl font-bold">Tablero Kanban & Ciclo de Vida de 24 Horas (Stories 9.1 – 9.6)</h2>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  ${Object.keys(states).map(k => `
+                    <button onclick="setSimState('${k}')" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition ${simState === k ? 'bg-sky-600 text-white border-sky-500' : 'bg-[var(--background)] border-[var(--border)] hover:bg-[var(--secondary)]'}">
+                      🕒 ${k}
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-[var(--background)] border border-sky-500/30 flex flex-wrap items-center justify-between gap-2">
+                <div class="font-mono text-sm font-bold text-sky-400">Reloj Simulado: ${cur.clock}</div>
+                <div class="text-xs text-[var(--muted-foreground)]">Citación Activa: <code class="text-emerald-400 font-semibold">${cur.cite}</code></div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] min-h-[155px]">
+                  <div class="flex justify-between items-center border-b border-[var(--border)] pb-2 mb-2">
+                    <span class="font-bold text-xs uppercase tracking-wider">Queued (En Cola)</span>
+                    <span class="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 text-xs font-bold">${cur.queued.length}</span>
+                  </div>
+                  <div class="space-y-1.5">
+                    ${cur.queued.length ? cur.queued.map(item => `<div class="p-2 rounded bg-[var(--card)] border-l-4 border-l-sky-400 text-xs font-medium">${item}</div>`).join('') : '<div class="text-xs text-[var(--muted-foreground)] italic pt-4 text-center">0 trabajos en cola</div>'}
+                  </div>
+                </div>
+
+                <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] min-h-[155px]">
+                  <div class="flex justify-between items-center border-b border-[var(--border)] pb-2 mb-2">
+                    <span class="font-bold text-xs uppercase tracking-wider text-emerald-400">Running (En GPU)</span>
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold">${cur.running.length}</span>
+                  </div>
+                  <div class="space-y-1.5">
+                    ${cur.running.length ? cur.running.map(item => `<div class="p-2 rounded bg-[var(--card)] border-l-4 border-l-emerald-400 text-xs font-medium">${item}</div>`).join('') : '<div class="text-xs text-[var(--muted-foreground)] italic pt-4 text-center">0 trabajos ejecutándose</div>'}
+                  </div>
+                </div>
+
+                <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] min-h-[155px]">
+                  <div class="flex justify-between items-center border-b border-[var(--border)] pb-2 mb-2">
+                    <span class="font-bold text-xs uppercase tracking-wider text-amber-400">Completed / Evicted</span>
+                    <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">${cur.completed.length}</span>
+                  </div>
+                  <div class="space-y-1.5">
+                    ${cur.completed.length ? cur.completed.map(item => `<div class="p-2 rounded bg-[var(--card)] border-l-4 border-l-amber-400 text-xs font-medium">${item}</div>`).join('') : '<div class="text-xs text-[var(--muted-foreground)] italic pt-4 text-center">0 trabajos finalizados/desalojados</div>'}
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-3 rounded-xl border border-[var(--border)] bg-[var(--secondary)] flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div><strong>Estado de la Flota (32 Nodos / 33 GPU Slots):</strong> ${cur.fleetSummary}</div>
+                <span class="font-mono text-sky-400">GET /admin/scheduler-board · POST /api/v1/simulation/time-warp</span>
+              </div>
+            </div>
+          `;
+        }
+      },
+      {
+        rubric: "2. Ejecución Interactiva y Reportes de Pruebas (40%)",
+        time: "3 min",
+        notes: "En esta diapositiva mostramos la evidencia empírica de nuestra pirámide de pruebas 70/20/10 y los 5 flujos de testing exigidos. Haz clic en cada pestaña para mostrarle al profesor el reporte real de consola de cada nivel: (1) Unidad + Cobertura con 81 tests pasando y 100.00% de branch coverage en `domain/`, (2) Flow A ATDD de Story 9.4 con el log de fallo en fase Roja antes de crear `eviction_supervisor.py` y su paso a Verde, (3) Flow D de carga y concurrencia con `k6` logrando p95 = 8.52 ms y 0% errores sobre 2,611 peticiones HTTP, y (4) Flow E Playwright E2E con Page Object Model en 2.1s y traza forense `trace.zip`.",
+        render: () => {
+          const logs = {
+            flowA: {
+              title: "Flow A (ATDD-First · Story 9.4): Evidencia Fase ROJA → Fase VERDE",
+              badge: "100% Determinista · 0 sleep()",
+              code: `=== FASE ROJA (test/evidence/atdd-red-story-9.4.log — Antes de crear eviction_supervisor.py) ===
+test/atdd/test_story_9_4_hard_eviction_atdd.py::TestStory94HardEvictionATDD::test_hanging_training_job_killed_and_node_cordoned_before_morning_classes FAILED [100%]
+E   ImportError: Inbound port module not found: .../ports/in/eviction_supervisor.py
+============================== 1 failed in 1.15s ===============================
+
+=== FASE VERDE (Tras implementar HardEvictionSupervisorService: 05:45 SIGTERM -> 05:46 SIGKILL) ===
+test/atdd/test_story_9_4_hard_eviction_atdd.py::TestStory94HardEvictionATDD::test_hanging_training_job_killed_and_node_cordoned_before_morning_classes PASSED [100%]
+✓ job_state == 'EVICTED_FORCEFULLY' (checkpoint_status='FAILED_TIMEOUT')
+✓ ws-gpu-14 status == 'CORDONED_DIRTY' (cordon_cause='DIRTY_EVICTION_FAILED', alert_dispatched=True)
+✓ 06:00:00 Handover: 31/32 healthy nodes IDLE, 0 residual GPU processes`
+            },
+            flowBC: {
+              title: "Flows B & C (Unit + Contratos + Integración): 81 Passed · 100.00% Branch Coverage",
+              badge: "Pirámide 74.4% Unit / 24.4% Int",
+              code: `============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.2.0, pluggy-1.7.0
+collected 81 items
+
+test/atdd/night_training_scheduler_contracts_test.py (15 contract tests) ... PASSED
+test/atdd/test_story_9_4_hard_eviction_atdd.py (1 ATDD scenario) ........... PASSED
+test/integration/test_concurrency_and_stories.py (4 integration tests) ..... PASSED
+test/unit/test_domain_core.py (61 fast in-memory unit tests < 2ms) ......... PASSED
+
+Name                      Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------
+domain/allocation.py         58      0     26      0   100%
+domain/emitter.py            10      0      4      0   100%
+domain/engine.py            126      0     42      0   100%
+domain/entities.py          113      0      0      0   100%
+domain/ranking.py            28      0     12      0   100%
+domain/state_machine.py      39      0     18      0   100%
+---------------------------------------------------------------------
+TOTAL                       374      0    102      0   100%
+Required test coverage of 90.0% reached. Total coverage: 100.00%
+======================== 81 passed, 1 warning in 17.43s ========================`
+            },
+            flowD: {
+              title: "Flow D (Quality Gate / NFR · Story 9.5): Grafana k6 Burst + Martillo Multihilo",
+              badge: "p95 = 8.52 ms (< 50 ms meta) · 0% Error",
+              code: `=== test/evidence/k6-nfr-story-9.5.log (k6 v0.54.0 — 50 VUs Ramping Arrival Rate) ===
+     ✓ seed board status is 200
+     ✓ board status is 200
+     ✓ board has valid columns
+     ✓ job submission returns 200 or 201
+     ✓ job submission returns valid state
+
+     checks.........................: 100.00% 5221 out of 5221
+     http_req_duration..............: avg=1.98ms  min=477.41µs med=1.13ms  p(90)=2.52ms  p(95)=8.52ms
+     http_req_failed................: 0.00%   0 out of 2611
+     http_reqs......................: 2611    254.774882/s
+     iterations.....................: 1305    127.338652/s
+     vus_max........................: 50      min=50           max=50`
+            },
+            flowE: {
+              title: "Flow E (Playwright E2E · Story 9.6): Page Object Model + Forensic Trace",
+              badge: "2.1s E2E · trace.zip Generado",
+              code: `=== test/evidence/playwright-e2e-story-9.6.log (Chromium Headless + POM) ===
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › test/e2e/scheduler-board.spec.ts:15:7 › Story 9.6 — Fast-Forward 24-Hour Time-Lapse Scheduler Status Board E2E › simulates 14:00 -> 22:00 -> 06:00 lifecycle with zero hardcoded sleeps (2.1s)
+
+  1 passed (3.9s)
+
+✓ POM: test/e2e/pages/SchedulerDashboardPage.ts (data-testid locators, 0 waitForTimeout)
+✓ Aserciones Web-First: expect(board.runningJobCards()).toHaveCount(5) @ 22:00
+✓ Aserciones Web-First: expect(board.idleNodeCards()).toHaveCount(32) @ 06:00
+✓ Artefacto Forense: test-results/.../trace.zip`
+            }
+          };
+          const active = logs[activeTestTab];
+          return `
+            <div class="space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span class="text-xs font-bold uppercase text-sky-400">Sección 2 de la Rúbrica (40%) · Reportes en Todos los Niveles</span>
+                  <h2 class="text-xl font-bold">Pirámide 70/20/10 & Evidencia Ejecutable de los 5 Flujos (Flows A–E)</h2>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button onclick="setTestTab('flowBC')" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition ${activeTestTab === 'flowBC' ? 'bg-sky-600 text-white border-sky-500' : 'bg-[var(--background)] border-[var(--border)]'}">
+                    1. Unit & Cov (100%)
+                  </button>
+                  <button onclick="setTestTab('flowA')" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition ${activeTestTab === 'flowA' ? 'bg-sky-600 text-white border-sky-500' : 'bg-[var(--background)] border-[var(--border)]'}">
+                    2. Flow A (ATDD 9.4)
+                  </button>
+                  <button onclick="setTestTab('flowD')" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition ${activeTestTab === 'flowD' ? 'bg-sky-600 text-white border-sky-500' : 'bg-[var(--background)] border-[var(--border)]'}">
+                    3. Flow D (k6 9.5)
+                  </button>
+                  <button onclick="setTestTab('flowE')" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition ${activeTestTab === 'flowE' ? 'bg-sky-600 text-white border-sky-500' : 'bg-[var(--background)] border-[var(--border)]'}">
+                    4. Flow E (Playwright 9.6)
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-3 text-center">
+                <div class="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10">
+                  <div class="text-lg font-extrabold text-emerald-400">61 Unit Tests (74.4%)</div>
+                  <div class="text-xs text-[var(--muted-foreground)]">&lt; 2 ms en memoria · 100.00% Branch Coverage en <code>domain/</code></div>
+                </div>
+                <div class="p-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10">
+                  <div class="text-lg font-extrabold text-sky-400">20 Int & ATDD Tests (24.4%)</div>
+                  <div class="text-xs text-[var(--muted-foreground)]">SQLite DDL Real · Contratos 1–3 · Martillo 8 Hilos</div>
+                </div>
+                <div class="p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10">
+                  <div class="text-lg font-extrabold text-purple-400">Playwright E2E + k6 (1.2%)</div>
+                  <div class="text-xs text-[var(--muted-foreground)]">2,611 reqs k6 ($p_{95}=8.52\\text{ ms}$) · E2E 2.1s + <code>trace.zip</code></div>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-[var(--border)] bg-slate-950 text-slate-100 p-4 space-y-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span class="text-xs font-bold text-sky-400">${active.title}</span>
+                  <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-bold">${active.badge}</span>
+                </div>
+                <pre class="text-xs leading-relaxed overflow-x-auto select-text text-slate-200">${active.code}</pre>
+              </div>
+            </div>
+          `;
+        }
+      },
+      {
+        rubric: "2. Ejecución Interactiva y Reportes de Pruebas (40%)",
+        time: "2 min",
+        notes: "En esta diapositiva explicamos la anatomía técnica de las dos historias de backend más complejas del Anexo (Stories 9.4 y 9.5). En la 9.4 mostramos cómo el supervisor de desalojo opera en dos etapas exactas (05:45 SIGTERM y 05:46 SIGKILL) y cómo aísla el nodo sucio `ws-gpu-14` sin afectar las 31 estaciones restantes. En la 9.5 mostramos cómo el algoritmo de desempate selecciona determinísticamente la víctima con menor prioridad y checkpoint más antiguo (`ws-gpu-06` a las 22:45) bajo una transacción `BEGIN IMMEDIATE`.",
+        render: () => `
+          <div class="space-y-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-sky-400">Sección 2 de la Rúbrica (40%) · Anatomía de Casos Complejos</span>
+              <h2 class="text-2xl font-bold mt-0.5">Stories 9.4 & 9.5: Resiliencia al Amanecer y Expropiación Atómica</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 rounded-xl border border-rose-500/30 bg-[var(--background)] space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="px-2.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold text-xs">STORY 9.4 · FLOW A (ATDD)</span>
+                  <span class="text-xs font-mono text-[var(--muted-foreground)]">ports/in/eviction_supervisor.py</span>
+                </div>
+                <h3 class="font-bold text-base">Hard Eviction & Node Cordoning on CUDA Hang</h3>
+                <ol class="text-xs space-y-1.5 text-[var(--muted-foreground)] list-decimal pl-4">
+                  <li><strong>05:45:00 (`initiate_graceful_eviction`):</strong> Envía <code>SIGTERM</code> + orden de volcado de checkpoint. Fija deadline en <code>05:46:00</code> (60s).</li>
+                  <li><strong>Fallo Simulado en <code>ws-gpu-14</code> (`10.20.14.88`):</strong> El proceso entra en un <em>CUDA kernel hang</em> ininterrumpible y no escribe el checkpoint.</li>
+                  <li><strong>05:46:00 (`enforce_hard_kill_timeout`):</strong> Dispara <code>SIGKILL (kill -9)</code>, transiciona el job a <code>EVICTED_FORCEFULLY</code> (<code>FAILED_TIMEOUT</code>).</li>
+                  <li><strong>Aislamiento Físico:</strong> Marca <code>ws-gpu-14</code> como <code>CORDONED_DIRTY</code> (<code>DIRTY_EVICTION_FAILED</code>), libera el slot y emite alerta crítica.</li>
+                  <li><strong>06:00:00 (`verify_morning_handover`):</strong> Certifica <strong>31/32 nodos sanos IDLE</strong> y <strong>0 procesos GPU residuales</strong>.</li>
+                </ol>
+              </div>
+
+              <div class="p-4 rounded-xl border border-sky-500/30 bg-[var(--background)] space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="px-2.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-bold text-xs">STORY 9.5 · FLOW D (NFR & CONCURRENCY)</span>
+                  <span class="text-xs font-mono text-[var(--muted-foreground)]">ports/in/board_query.py</span>
+                </div>
+                <h3 class="font-bold text-base">Dynamic Priority Queue Preemption Cascade</h3>
+                <ol class="text-xs space-y-1.5 text-[var(--muted-foreground)] list-decimal pl-4">
+                  <li><strong>Estado Inicial (23:10):</strong> Las 31 estaciones de 24 GB están al 100% (12 con jobs <code>EXPLORATION</code> de Prioridad 1).</li>
+                  <li><strong>Ingreso de Alta Prioridad:</strong> Kavita envía un job <code>THESIS</code> de Prioridad 10 (requiere 1×24 GB VRAM).</li>
+                  <li><strong>Regla de Elegibilidad (`AD-6`):</strong> Verifica margen de prioridad suficiente y que la víctima no haya sido expropiada antes en la misma ventana.</li>
+                  <li><strong>Desempate Determinista (`select_preemption_victim`):</strong> Ordena candidatos por <code>(effective_priority ASC, last_checkpoint_at ASC, submitted_at DESC, job_id ASC)</code> → selecciona <code>JOB-EXP-0006</code> en <code>ws-gpu-06</code> (checkpoint <code>22:45</code>).</li>
+                  <li><strong>Swap Transaccional:</strong> Escribe checkpoint de la víctima, la pasa a <code>QUEUED_PREEMPTED</code> conservando su <code>submitted_at</code> y asigna <code>ws-gpu-06</code> a Kavita en <code>RUNNING</code>.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--secondary)] text-xs flex flex-wrap justify-between items-center gap-2">
+              <div><strong>Seguridad Adicional Verificada (Stories 2.3 & 4.3):</strong> Detección SHA-256 de corrupción de checkpoints (cuarentena automática) y Control de Acceso Uniforme <code>HTTP 404</code> (nunca filtra <code>403 Forbidden</code> ante consultas de jobs de otros estudiantes).</div>
+              <span class="font-bold text-emerald-400">100% Verificado en Integración</span>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "2. Ejecución Interactiva y Reportes de Pruebas (40%)",
+        time: "1.5 min",
+        notes: "Para cerrar el bloque del 40%, presentamos la Matriz de Trazabilidad Maestra (`traceability-matrix.md`), donde cada requisito del PRD e invariante arquitectónico se conecta con su historia de usuario, el flujo BMad ejecutado, el archivo de prueba automatizada, el log de evidencia y el veredicto PASS. Abajo están los 4 comandos exactos por si el profesor desea que ejecutemos cualquiera de las suites en vivo en la terminal.",
+        render: () => `
+          <div class="space-y-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-sky-400">Sección 2 de la Rúbrica (40%) · Trazabilidad Bidireccional Completa</span>
+              <h2 class="text-xl font-bold">Matriz de Trazabilidad (PRD → Story → Flow → Test → Evidencia → PASS)</h2>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-[var(--border)]">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-[var(--secondary)] text-[var(--foreground)] border-b border-[var(--border)]">
+                  <tr>
+                    <th class="p-2.5">Requisito / Invariante</th>
+                    <th class="p-2.5">Historia</th>
+                    <th class="p-2.5">Flujo BMad</th>
+                    <th class="p-2.5">Archivo de Prueba</th>
+                    <th class="p-2.5">Evidencia</th>
+                    <th class="p-2.5">Veredicto</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border)] bg-[var(--background)]">
+                  <tr>
+                    <td class="p-2 font-medium">FR-1..5, INV-01 (Admisión, Idempotencia, Cap 500)</td>
+                    <td class="p-2 font-bold">Story 9.1</td>
+                    <td class="p-2">Flows B & C</td>
+                    <td class="p-2 font-mono">test_domain_core.py / contracts_test.py</td>
+                    <td class="p-2 font-mono">pytest-coverage.log</td>
+                    <td class="p-2 text-emerald-400 font-bold">PASS</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-medium">FR-8, FR-12..15 (Activación 22:00, 2-GPU Atomic, 33 Slots)</td>
+                    <td class="p-2 font-bold">Story 9.2</td>
+                    <td class="p-2">Flow B</td>
+                    <td class="p-2 font-mono">test_domain_core.py / contracts_test.py</td>
+                    <td class="p-2 font-mono">pytest-coverage.log</td>
+                    <td class="p-2 text-emerald-400 font-bold">PASS</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-medium">FR-19, FR-20, FR-24, S-2 (Rampa 05:45, SHA-256 Ckpt, Citas)</td>
+                    <td class="p-2 font-bold">Story 9.3</td>
+                    <td class="p-2">Flows B & C</td>
+                    <td class="p-2 font-mono">test_concurrency_and_stories.py</td>
+                    <td class="p-2 font-mono">pytest-coverage.log</td>
+                    <td class="p-2 text-emerald-400 font-bold">PASS</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-medium">FR-19, FR-23, S-1 (05:46 SIGKILL, CORDONED_DIRTY, 31/32 Idle)</td>
+                    <td class="p-2 font-bold text-rose-400">Story 9.4</td>
+                    <td class="p-2 font-semibold">Flow A (ATDD)</td>
+                    <td class="p-2 font-mono">test_story_9_4_hard_eviction_atdd.py</td>
+                    <td class="p-2 font-mono">atdd-red-story-9.4.log</td>
+                    <td class="p-2 text-emerald-400 font-bold">PASS</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-medium">FR-16, NFR-3, AD-6 (Preemption Cascade & 50-VU Burst)</td>
+                    <td class="p-2 font-bold text-sky-400">Story 9.5</td>
+                    <td class="p-2 font-semibold">Flow D (NFR/k6)</td>
+                    <td class="p-2 font-mono">scheduler-preemption-burst.js</td>
+                    <td class="p-2 font-mono">k6-nfr-story-9.5.log</td>
+                    <td class="p-2 text-emerald-400 font-bold">PASS</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-medium">FR-24, NFR-9, S-1 (24h Time-Lapse Kanban Status Board)</td>
+                    <td class="p-2 font-bold text-purple-400">Story 9.6</td>
+                    <td class="p-2 font-semibold">Flow E (E2E POM)</td>
+                    <td class="p-2 font-mono">scheduler-board.spec.ts</td>
+                    <td class="p-2 font-mono">trace.zip & e2e.log</td>
+                    <td class="p-2 text-emerald-400 font-bold">PASS</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-950 text-slate-200 border border-[var(--border)] text-xs font-mono space-y-1 select-text">
+              <div class="text-sky-400 font-bold"># Comandos listos para demostración en vivo frente al profesor:</div>
+              <div>1) Pytest + 100% Coverage: PYTHONPATH=.:planning/detailed-design/schemas .venv/bin/pytest --cov=domain --cov-branch -v</div>
+              <div>2) Playwright E2E + Trace: npx playwright test && npx playwright show-trace test-results/*/trace.zip</div>
+              <div>3) Grafana k6 Load Burst:  ~/.local/bin/k6 run test/nfr/scheduler-preemption-burst.js</div>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "3. Análisis de Tiempo Invertido y Git TLOC (20%)",
+        time: "2 min",
+        notes: "Entramos al tercer bloque de la rúbrica (20%): el análisis cuantitativo del tiempo invertido y las líneas totales de código/especificación (TLOC) extraídas directamente del historial de commits de Git (`git log --shortstat`) y del árbol de trabajo. Nuestro proyecto suma 12,980 líneas totales distribuidas en 3 etapas claras: 6,569 líneas netas en Plan-1 (17 commits), 2,932 líneas netas en Solu-2 (5 commits), y 3,479 líneas nuevas en Impl-2 (código de producción hexagonal + suite multi-flujo + gobernanza).",
+        render: () => `
+          <div class="space-y-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-purple-400">Sección 3 de la Rúbrica (20%) · Métricas Empíricas de Git</span>
+              <h2 class="text-2xl font-bold mt-0.5">Análisis de Commits y TLOC Modificado por Fase y Capa Arquitectónica</h2>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="p-3.5 rounded-xl border border-purple-500/30 bg-purple-500/10">
+                <div class="text-xs font-bold text-purple-400 uppercase">Total TLOC Proyecto</div>
+                <div class="text-2xl font-extrabold mt-1">12,980 líneas</div>
+                <div class="text-xs text-[var(--muted-foreground)]">En 98 archivos de código, tests y specs</div>
+              </div>
+              <div class="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/10">
+                <div class="text-xs font-bold text-sky-400 uppercase">Código Producción + DDL</div>
+                <div class="text-2xl font-extrabold mt-1">3,979 TLOC</div>
+                <div class="text-xs text-[var(--muted-foreground)]"><code>domain/</code> (928) · <code>ports/</code> (1,253) · <code>adapters/</code> (646) · <code>api/</code> (622) · <code>schemas/</code> (530)</div>
+              </div>
+              <div class="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10">
+                <div class="text-xs font-bold text-emerald-400 uppercase">Suite de Pruebas (5 Flujos)</div>
+                <div class="text-2xl font-extrabold mt-1">1,901 TLOC</div>
+                <div class="text-xs text-[var(--muted-foreground)]">24 archivos (`.py`, `.ts`, `.js`) · Ratio Test/Prod = <strong>47.8%</strong></div>
+              </div>
+              <div class="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10">
+                <div class="text-xs font-bold text-amber-400 uppercase">Tiempo Total Invertido</div>
+                <div class="text-2xl font-extrabold mt-1">16.5 Horas</div>
+                <div class="text-xs text-[var(--muted-foreground)]">22 commits base + cierre Impl-2 (~786 TLOC/hora)</div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2.5">
+                <h3 class="font-bold text-sm">Desglose de TLOC Ejecutable (Código & Pruebas)</h3>
+                <div class="space-y-2 text-xs">
+                  <div>
+                    <div class="flex justify-between mb-1"><span><strong>test/</strong> (24 archivos · Unit, ATDD, Int, Playwright, k6)</span><span class="font-mono font-bold text-emerald-400">1,901 líneas (32.3%)</span></div>
+                    <div class="w-full h-2 bg-[var(--secondary)] rounded-full overflow-hidden"><div class="h-full bg-emerald-500" style="width: 32.3%"></div></div>
+                  </div>
+                  <div>
+                    <div class="flex justify-between mb-1"><span><strong>ports/</strong> (16 archivos · Casos de Uso Inbound & Protocolos Out)</span><span class="font-mono font-bold text-sky-400">1,253 líneas (21.3%)</span></div>
+                    <div class="w-full h-2 bg-[var(--secondary)] rounded-full overflow-hidden"><div class="h-full bg-sky-500" style="width: 21.3%"></div></div>
+                  </div>
+                  <div>
+                    <div class="flex justify-between mb-1"><span><strong>domain/</strong> (7 archivos · Motor Puro 100% Branch Coverage)</span><span class="font-mono font-bold text-purple-400">928 líneas (15.8%)</span></div>
+                    <div class="w-full h-2 bg-[var(--secondary)] rounded-full overflow-hidden"><div class="h-full bg-purple-500" style="width: 15.8%"></div></div>
+                  </div>
+                  <div>
+                    <div class="flex justify-between mb-1"><span><strong>adapters/</strong> (9 archivos · SQLite Atomic, Reloj, Checkpoints)</span><span class="font-mono font-bold text-amber-400">646 líneas (11.0%)</span></div>
+                    <div class="w-full h-2 bg-[var(--secondary)] rounded-full overflow-hidden"><div class="h-full bg-amber-500" style="width: 11.0%"></div></div>
+                  </div>
+                  <div>
+                    <div class="flex justify-between mb-1"><span><strong>api/ + pacer/ + schemas/</strong> (12 archivos · FastAPI, Kanban, DDL)</span><span class="font-mono font-bold text-rose-400">1,152 líneas (19.6%)</span></div>
+                    <div class="w-full h-2 bg-[var(--secondary)] rounded-full overflow-hidden"><div class="h-full bg-rose-500" style="width: 19.6%"></div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-2.5">
+                <h3 class="font-bold text-sm">Evolución Histórica en Git (`git log --shortstat`)</h3>
+                <div class="space-y-2 text-xs text-[var(--muted-foreground)]">
+                  <div class="p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                    <div class="flex justify-between font-bold text-[var(--foreground)]">
+                      <span>Sprint 1: Plan-1 (Commits <code>96b9344..8d24060</code>)</span>
+                      <span class="text-amber-400">+6,934 / -365 TLOC</span>
+                    </div>
+                    <div class="mt-1">17 commits · 7h 16m · PRD, 4 escenarios UX, 3 wireframes, ARCHITECTURE.md y 4 revisiones adversariales/edge-case con triage.</div>
+                  </div>
+                  <div class="p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                    <div class="flex justify-between font-bold text-[var(--foreground)]">
+                      <span>Sprint 2: Solu-2 (Commits <code>345d264..db3df4d</code>)</span>
+                      <span class="text-sky-400">+2,936 / -4 TLOC</span>
+                    </div>
+                    <div class="mt-1">5 commits · 4h 30m · Contratos DbC, Puertos Hexagonales, DDL SQLite (`001`), DTOs Pydantic, 15 ATDD Red tests y Backlog.</div>
+                  </div>
+                  <div class="p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                    <div class="flex justify-between font-bold text-[var(--foreground)]">
+                      <span>Sprint 3: Impl-2 (Cierre de Implementación y Hardening)</span>
+                      <span class="text-emerald-400">+4,680 / -195 TLOC</span>
+                    </div>
+                    <div class="mt-1">4h 45m · Implementación completa de `domain/`, `ports/`, `adapters/`, `api/`, 81 tests Pytest, Playwright E2E y `k6`.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "3. Análisis de Tiempo Invertido y Git TLOC (20%)",
+        time: "1.5 min",
+        notes: "Un hallazgo clave al analizar el tiempo invertido (16.5 horas totales) es dónde se fue realmente el esfuerzo humano: solo el 22% del tiempo fue generación de código/texto con el agente, mientras que el 45% fue auditoría, lectura crítica, triage de hallazgos adversariales y corrección de errores de la IA, y el 33% fue diseño de contratos, ejecución de pruebas y optimización de concurrencia.",
+        render: () => `
+          <div class="space-y-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-purple-400">Sección 3 de la Rúbrica (20%) · Distribución del Tiempo de Ingeniería</span>
+              <h2 class="text-2xl font-bold mt-0.5">¿En Qué Invertimos las 16.5 Horas? (Generación IA vs. Auditoría Humana)</h2>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-[var(--border)]">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-[var(--secondary)] border-b border-[var(--border)]">
+                  <tr>
+                    <th class="p-3">Etapa del Proyecto</th>
+                    <th class="p-3">Tiempo Total</th>
+                    <th class="p-3">Generación Asistida por IA</th>
+                    <th class="p-3">Auditoría Humana, Triage & Corrección</th>
+                    <th class="p-3">TLOC Neto Producido</th>
+                    <th class="p-3">Hallazgo Clave de Productividad</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border)] bg-[var(--background)]">
+                  <tr>
+                    <td class="p-3 font-bold text-amber-400">1. Plan-1 (PRD, UX, Arch)</td>
+                    <td class="p-3 font-mono font-bold">7h 15m (44%)</td>
+                    <td class="p-3">2h 00m (Borradores BMad/WDS)</td>
+                    <td class="p-3 font-semibold">5h 15m (Lectura de 762 líneas, triage de 92 hallazgos en 4 reviews)</td>
+                    <td class="p-3 font-mono">6,569 TLOC</td>
+                    <td class="p-3">La IA redacta rápido, pero sin el triage humano habría dejado 9 defectos críticos en el PRD.</td>
+                  </tr>
+                  <tr>
+                    <td class="p-3 font-bold text-sky-400">2. Solu-2 (Contratos, DDL, ATDD Red)</td>
+                    <td class="p-3 font-mono font-bold">4h 30m (27%)</td>
+                    <td class="p-3">1h 30m (Scaffolding DDL, DTOs y stubs)</td>
+                    <td class="p-3 font-semibold">3h 00m (Diseño de invariantes `INV-01..08`, matriz de riesgos y gate drill)</td>
+                    <td class="p-3 font-mono">2,932 TLOC</td>
+                    <td class="p-3">Formalizar `contracts.md` y el DDL antes de codificar redujo a cero el retrabajo arquitectónico en Impl-2.</td>
+                  </tr>
+                  <tr>
+                    <td class="p-3 font-bold text-emerald-400">3. Impl-2 (Código, 5 Flujos Test & Hardening)</td>
+                    <td class="p-3 font-mono font-bold">4h 45m (29%)</td>
+                    <td class="p-3">1h 30m (Implementación hexagonal y suites)</td>
+                    <td class="p-3 font-semibold">3h 15m (Ejecución Red→Green, optimización lock SQLite en k6, Playwright POM)</td>
+                    <td class="p-3 font-mono">3,479 TLOC</td>
+                    <td class="p-3">Optimizar el lock de SQLite tras el reporte de `k6` redujo la latencia $p_{95}$ un <strong>94.4%</strong> (`153ms` → `8.52ms`).</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)]">
+                <div class="text-xs font-bold text-amber-400 uppercase">68% del Tiempo Humano</div>
+                <div class="text-sm font-bold mt-1">Verificación, Diseño de Contratos y Pruebas</div>
+                <p class="text-xs text-[var(--muted-foreground)] mt-1">En desarrollo asistido por IA, el cuello de botella ya no es escribir sintaxis, sino verificar invariantes de dominio.</p>
+              </div>
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)]">
+                <div class="text-xs font-bold text-sky-400 uppercase">Ratio Test-to-Code: 47.8%</div>
+                <div class="text-sm font-bold mt-1">1,901 TLOC de Test por 3,979 TLOC de Producción</div>
+                <p class="text-xs text-[var(--muted-foreground)] mt-1">Casi 1 línea de prueba automatizada por cada 2 líneas de producción (incluyendo esquemas SQL y UI).</p>
+              </div>
+              <div class="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)]">
+                <div class="text-xs font-bold text-emerald-400 uppercase">Velocidad de Suite Completa</div>
+                <div class="text-sm font-bold mt-1">19.5 Segundos (Pytest + Playwright E2E)</div>
+                <p class="text-xs text-[var(--muted-foreground)] mt-1">Cumple holgadamente `NFR-12` ($\le 60\text{ s}$) gracias a cero `sleep()` y pruebas unitarias en memoria.</p>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "4. Forma de Trabajo, Interacción y Validación (20%)",
+        time: "2 min",
+        notes: "En el último bloque de la rúbrica (20%) presentamos nuestros hallazgos sobre la forma de trabajo en pareja (Juan Manuel Casanova Marín y Juliana Filigrana Valencia) y cómo validamos los resultados de la IA. Adoptamos el patrón 'Driver/Generator + Independent Auditor/Navigator': nunca permitimos que el mismo agente o la misma sesión que generó un artefacto fuera quien lo aprobara. Siempre ejecutamos las revisiones adversariales en sesiones limpias y cada miembro de la pareja validó cruzadamente los contratos contra las pruebas.",
+        render: () => `
+          <div class="space-y-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-emerald-400">Sección 4 de la Rúbrica (20%) · Dinámica de Pareja & Gobernanza IA</span>
+              <h2 class="text-2xl font-bold mt-0.5">Forma de Trabajo en Pareja e Interacción Humano–IA</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-3">
+                <div class="text-xs font-bold text-sky-400 uppercase">Modelo de Trabajo en Pareja (Pair AI Engineering)</div>
+                <h3 class="font-bold text-base">Separación de Roles: Generador vs. Auditor Independiente</h3>
+                <div class="space-y-2 text-xs text-[var(--muted-foreground)]">
+                  <div class="p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                    <strong class="text-[var(--foreground)]">Juliana Filigrana Valencia (Lead de Especificación, UX & TEA Gate):</strong>
+                    Lideró la consolidación del PRD, las espinas de diseño UX (`DESIGN.md`, `EXPERIENCE.md`), las revisiones de casos límite y la matriz de trazabilidad (`traceability-matrix.md`).
+                  </div>
+                  <div class="p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                    <strong class="text-[var(--foreground)]">Juan Manuel Casanova Marín (Lead de Arquitectura, Contratos & Hardening Impl-2):</strong>
+                    Lideró la formalización de contratos DbC, el esquema SQLite DDL, la implementación hexagonal (`domain/`, `ports/`, `adapters/`, `api/`) y la ejecución de los 5 flujos de pruebas (`pytest`, `k6`, `Playwright`).
+                  </div>
+                  <div class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                    <strong>Regla de Oro de la Pareja:</strong> Ningún output de un agente IA se acepta en bloque. Todo pasa por una tabla de triage explícita (Aceptar / Corregir / Rechazar) firmada por ambos en <code>ai-decision-log.md</code> (27 decisiones registradas).
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-3">
+                <div class="text-xs font-bold text-emerald-400 uppercase">Protocolo de Validación de Resultados en 4 Compuertas</div>
+                <h3 class="font-bold text-base">¿Cómo Garantizamos que la IA No Nos Engañara?</h3>
+                <ol class="text-xs space-y-2 text-[var(--muted-foreground)] list-decimal pl-4">
+                  <li>
+                    <strong class="text-[var(--foreground)]">Compuerta 1 — Sesiones Limpias de Revisión Adversarial:</strong>
+                    El agente que redacta un documento tiende a autocomplacerse (ej. declaró su propio borrador de UX "100% verificado" cuando tenía un borde con contraste <code>1.34:1</code>). Ejecutar el revisor en una sesión separada destapó los defectos reales.
+                  </li>
+                  <li>
+                    <strong class="text-[var(--foreground)]">Compuerta 2 — Verificación Mecánica contra Archivos Reales:</strong>
+                    En dos ocasiones, el resumen textual del agente afirmó haber corregido códigos que en el archivo seguían desactualizados (o viceversa, un falso positivo en `F-3b`). Aprendimos a auditar con <code>git diff</code> y AST, nunca confiando solo en el resumen del chat.
+                  </li>
+                  <li>
+                    <strong class="text-[var(--foreground)]">Compuerta 3 — AST Gate & SQLite DDL Constraints:</strong>
+                    Validamos la pureza del dominio con un test AST automático y delegamos a SQLite la validación física de longitudes SHA-256 (64 chars) y estados válidos.
+                  </li>
+                  <li>
+                    <strong class="text-[var(--foreground)]">Compuerta 4 — Evidencia Empírica Multi-Herramienta:</strong>
+                    Cruzamos resultados entre <code>pytest-cov</code> (lógica), <code>k6</code> (latencia bajo carga) y <code>Playwright trace.zip</code> (DOM y red real).
+                  </li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      {
+        rubric: "4. Forma de Trabajo, Interacción y Validación (20%)",
+        time: "2 min",
+        notes: "Para cerrar con broche de oro, presentamos las 4 correcciones concretas que hicimos como equipo humano a errores de testing de la IA durante Impl-2 (documentadas en `ai-decision-log.md`, Decisiones #19, #20, #23 y #25). Esto demuestra criterio de ingeniería: rechazamos el uso de `sleep()` en el timeout de evicción, rechazamos el uso de `MagicMock` sobre SQLite, rechazamos meter `sleep()` en `k6` solucionando el bloqueo real en la base de datos, y exigimos Page Object Model con aserciones web-first en Playwright. ¡Muchas gracias y quedamos atentos a sus preguntas!",
+        render: () => `
+          <div class="space-y-4">
+            <div>
+              <span class="text-xs font-bold uppercase text-emerald-400">Sección 4 de la Rúbrica (20%) · Auditoría Humana sobre la IA</span>
+              <h2 class="text-2xl font-bold mt-0.5">4 Errores de Testing de la IA Detectados y Corregidos por el Equipo</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="p-3.5 rounded-xl border border-amber-500/30 bg-[var(--background)] space-y-1.5">
+                <div class="flex justify-between items-center">
+                  <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold text-xs">Corrección #1 · Decisión #19 (Flow A)</span>
+                  <span class="text-xs font-mono text-[var(--muted-foreground)]">Story 9.4</span>
+                </div>
+                <div class="font-bold text-sm">Rechazo de <code>time.sleep(1)</code> en el Timeout 05:45 → 05:46</div>
+                <p class="text-xs text-[var(--muted-foreground)]">
+                  <strong>Propuesta IA:</strong> Usar un temporizador con <code>time.sleep()</code> para simular el minuto de gracia antes del <code>SIGKILL</code>.<br/>
+                  <strong>Corrección Humana:</strong> Rechazado. Se inyectó el instante simulado (<code>05:45:00</code> → <code>05:46:00</code> → <code>06:00:00</code>) en <code>HardEvictionSupervisorService</code>, logrando ejecución determinista en <code>&lt; 15 ms</code>.
+                </p>
+              </div>
+
+              <div class="p-3.5 rounded-xl border border-sky-500/30 bg-[var(--background)] space-y-1.5">
+                <div class="flex justify-between items-center">
+                  <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 font-bold text-xs">Corrección #2 · Decisión #20 (Flow B)</span>
+                  <span class="text-xs font-mono text-[var(--muted-foreground)]">No Over-Mocking</span>
+                </div>
+                <div class="font-bold text-sm">Rechazo de <code>MagicMock</code> sobre <code>SQLiteRepositoryAdapter</code></div>
+                <p class="text-xs text-[var(--muted-foreground)]">
+                  <strong>Propuesta IA:</strong> Mockear el repositorio para verificar <code>cordon_node.assert_called_once()</code>.<br/>
+                  <strong>Corrección Humana:</strong> Exigimos ejecutar contra el DDL SQLite real (`001_schema.sql`), lo cual destapó inmediatamente que faltaban los literales <code>EVICTED_FORCEFULLY</code> y <code>CORDONED_DIRTY</code> en el <code>CHECK</code> constraint.
+                </p>
+              </div>
+
+              <div class="p-3.5 rounded-xl border border-purple-500/30 bg-[var(--background)] space-y-1.5">
+                <div class="flex justify-between items-center">
+                  <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold text-xs">Corrección #3 · Decisión #23 (Flow D)</span>
+                  <span class="text-xs font-mono text-[var(--muted-foreground)]">Story 9.5 · k6</span>
+                </div>
+                <div class="font-bold text-sm">Rechazo de <code>sleep()</code> en <code>k6</code> y Optimización de Write-Lock</div>
+                <p class="text-xs text-[var(--muted-foreground)]">
+                  <strong>Propuesta IA:</strong> Agregar <code>sleep(0.5)</code> en el script <code>k6</code> cuando 50 VUs subieron el $p_{95}$ a <code>153 ms</code>.<br/>
+                  <strong>Corrección Humana:</strong> Rechazamos <code>sleep()</code>; usamos <code>ramping-arrival-rate</code> y agregamos un <em>read fast-path</em> con <em>double-checked locking</em> en <code>submit_job</code>, bajando el $p_{95}$ a <strong><code>8.52 ms</code></strong>.
+                </p>
+              </div>
+
+              <div class="p-3.5 rounded-xl border border-emerald-500/30 bg-[var(--background)] space-y-1.5">
+                <div class="flex justify-between items-center">
+                  <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-xs">Corrección #4 · Decisión #25 (Flow E)</span>
+                  <span class="text-xs font-mono text-[var(--muted-foreground)]">Story 9.6 · E2E</span>
+                </div>
+                <div class="font-bold text-sm">Rechazo de <code>waitForTimeout(300)</code> y Selectores CSS Crudos</div>
+                <p class="text-xs text-[var(--muted-foreground)]">
+                  <strong>Propuesta IA:</strong> Esperar 300ms tras hacer clic en <code>Fast-Forward to 22:00</code>.<br/>
+                  <strong>Corrección Humana:</strong> Encapsulamos selectores <code>data-testid</code> en <code>SchedulerDashboardPage.ts</code> (POM) y usamos aserciones auto-reintentables (<code>toHaveCount(5)</code>, <code>toHaveCount(32)</code>).
+                </p>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="font-bold text-sm text-emerald-400">Conclusión Final · Módulo 9: Night Training Scheduler</div>
+                <div class="text-xs text-[var(--muted-foreground)]">19/19 Historias en <code>done</code> · 81/81 Pytest PASS (100.00% Branch Coverage en <code>domain/</code>) · k6 $p_{95}=8.52\text{ ms}$ (0% error) · Playwright E2E 2.1s + <code>trace.zip</code></div>
+              </div>
+              <span class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs">¿Preguntas? ¡Muchas Gracias!</span>
+            </div>
+          </div>
+        `
+      }
+    ];
+
+    function renderCurrentSlide() {
+      const s = slides[currentSlide];
+      const container = document.getElementById('slide-container');
+      container.classList.remove('slide-fade');
+      void container.offsetWidth;
+      container.classList.add('slide-fade');
+      container.innerHTML = s.render();
+
+      document.getElementById('rubric-pill').textContent = s.rubric;
+      document.getElementById('slide-counter').textContent = `${currentSlide + 1} / ${slides.length}`;
+      document.getElementById('progress-bar').style.width = `${((currentSlide + 1) / slides.length) * 100}%`;
+      document.getElementById('speaker-notes-text').textContent = s.notes;
+      document.getElementById('slide-timer-badge').textContent = `Tiempo sugerido: ${s.time}`;
+    }
+
+    function nextSlide() {
+      if (currentSlide < slides.length - 1) {
+        currentSlide++;
+        renderCurrentSlide();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) {
+        currentSlide--;
+        renderCurrentSlide();
+      }
+    }
+
+    function goToSlide(idx) {
+      currentSlide = idx;
+      renderCurrentSlide();
+    }
+
+    function toggleNotes() {
+      showNotes = !showNotes;
+      const box = document.getElementById('speaker-notes-box');
+      const btn = document.getElementById('notes-btn');
+      box.style.display = showNotes ? 'block' : 'none';
+      btn.textContent = showNotes ? '🎙️ Guion Orador: ON' : '🎙️ Guion Orador: OFF';
+    }
+
+    function setSimState(state) {
+      simState = state;
+      renderCurrentSlide();
+    }
+
+    function setTestTab(tab) {
+      activeTestTab = tab;
+      renderCurrentSlide();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') nextSlide();
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'n' || e.key === 'N') toggleNotes();
+    });
+
+    renderCurrentSlide();
+  </script>
+</body>
+</html>

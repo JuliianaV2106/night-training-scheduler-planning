@@ -3,6 +3,8 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+.coverage
+.pytest_cache/
 
 # Instalaciones de herramientas IA (se regeneran con el instalador de BMad/WDS)
 .agents/

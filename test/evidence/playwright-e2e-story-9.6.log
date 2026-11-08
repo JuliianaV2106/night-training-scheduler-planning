@@ -1,0 +1,16 @@
+﻿node.exe : [WebServer] INFO:     Started server process [413]
+At line:1 char:1
++ & "C:\Users\juanc\AppData\Local\fnm_multishells\14208_1794094189019/n ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([WebServer] INF...r process [413]:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+
+Running 1 test using 1 worker
+
+  ok 1 [chromium] › test\e2e\scheduler-board.spec.ts:18:3 › Story 9.6: Fast-Forward 24-Hour Time-Lapse Scheduler Status Board E2E › Operator time-warps cluster and observes automated night window execution (2.1s)
+
+  1 passed (15.5s)

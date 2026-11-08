@@ -1,0 +1,115 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.2.0, pluggy-1.7.0 -- /mnt/c/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning
+configfile: pytest.ini
+testpaths: test
+plugins: anyio-4.16.0, hypothesis-6.170.15, asyncio-1.4.1.post1, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 81 items
+
+test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_happy_path_admits_and_persists_pending_job PASSED [  1%]
+test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_precondition_violation_distributed_spec_rejected_with_zero_state_mutation PASSED [  2%]
+test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_queue_cap_500_enforced_under_burst_submissions PASSED [  3%]
+test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_invariant_two_gpu_requires_48gb_physically_enforced PASSED [  4%]
+test/atdd/night_training_scheduler_contracts_test.py::TestSubmitJobContract::test_submit_job_explainability_payload_cites_jobspec_validation_rule PASSED [  6%]
+test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_happy_path_places_jobs_deterministically PASSED [  7%]
+test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_precondition_violation_outside_window_rejected PASSED [  8%]
+test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_total_allocated_slots_never_exceeds_33 PASSED [  9%]
+test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_invariant_atomic_server_gpu_allocation PASSED [ 11%]
+test/atdd/night_training_scheduler_contracts_test.py::TestActivateWindowContract::test_activate_window_explainability_payload_cites_policy_and_admission_ranking PASSED [ 12%]
+test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_evict_at_deadline_happy_path_completes_checkpoint_and_releases_slots PASSED [ 13%]
+test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_evict_at_deadline_precondition_violation_called_before_ramp_rejected PASSED [ 14%]
+test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_mandatory_edge_case_checkpoint_failure_at_dawn_cordons_node_releases_all_slots_at_0600 PASSED [ 16%]
+test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_mandatory_edge_case_user_notified_and_job_rescheduled_after_dawn_checkpoint_failure PASSED [ 17%]
+test/atdd/night_training_scheduler_contracts_test.py::TestEvictAtDeadlineContract::test_evict_at_deadline_explainability_payload_cites_day_reclaim_policy PASSED [ 18%]
+test/atdd/test_story_9_4_hard_eviction_atdd.py::TestStory94HardEvictionATDD::test_hanging_training_job_killed_and_node_cordoned_before_morning_classes PASSED [ 19%]
+test/integration/test_concurrency_and_stories.py::TestStory95PreemptionCascadeAndConcurrency::test_story_9_5_high_priority_job_preempts_lowest_priority_earliest_checkpointed_job_on_ws_gpu_06 PASSED [ 20%]
+test/integration/test_concurrency_and_stories.py::TestStory95PreemptionCascadeAndConcurrency::test_concurrent_preemption_hammer_zero_double_allocation PASSED [ 22%]
+test/integration/test_concurrency_and_stories.py::TestAdditionalStoriesAndContracts::test_story_2_3_corrupt_checkpoint_detection_and_quarantine PASSED [ 23%]
+test/integration/test_concurrency_and_stories.py::TestAdditionalStoriesAndContracts::test_story_4_3_uniform_404_access_control_and_identity_redaction PASSED [ 24%]
+test/unit/test_domain_core.py::TestDomainPurityAstGate::test_domain_purity_ast_scan_has_zero_forbidden_imports PASSED [ 25%]
+test/unit/test_domain_core.py::TestStateMachineAndGuards::test_terminal_states_identification PASSED [ 27%]
+test/unit/test_domain_core.py::TestStateMachineAndGuards::test_legal_and_illegal_state_transitions PASSED [ 28%]
+test/unit/test_domain_core.py::TestStateMachineAndGuards::test_window_activation_instant_guard PASSED [ 29%]
+test/unit/test_domain_core.py::TestStateMachineAndGuards::test_eviction_instant_guard PASSED [ 30%]
+test/unit/test_domain_core.py::TestStateMachineAndGuards::test_preemption_eligibility_guards PASSED [ 32%]
+test/unit/test_domain_core.py::TestRankingAndAllocation::test_compute_effective_priority_aging_and_starvation PASSED [ 33%]
+test/unit/test_domain_core.py::TestRankingAndAllocation::test_rank_candidate_jobs_deterministic_order PASSED [ 34%]
+test/unit/test_domain_core.py::TestRankingAndAllocation::test_select_preemption_victim_picks_lowest_priority_earliest_checkpoint PASSED [ 35%]
+test/unit/test_domain_core.py::TestRankingAndAllocation::test_allocate_window_batch_and_affinity_and_exhaustion PASSED [ 37%]
+test/unit/test_domain_core.py::TestEmitterAndEngineRules::test_emitter_fails_closed_on_empty_citations_or_summary PASSED [ 38%]
+test/unit/test_domain_core.py::TestEmitterAndEngineRules::test_validate_job_submission_rules_all_branches PASSED [ 39%]
+test/unit/test_domain_core.py::TestEmitterAndEngineRules::test_evaluate_dawn_eviction_happy_and_failure_branches PASSED [ 40%]
+test/unit/test_domain_core.py::TestEmitterAndEngineRules::test_evaluate_preemption_cascade_and_recovery_fold PASSED [ 41%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PENDING_WINDOW-RUNNING] PASSED [ 43%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PENDING_WINDOW-QUEUED_PENDING_WINDOW] PASSED [ 44%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PENDING_WINDOW-EXPIRED] PASSED [ 45%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PENDING_WINDOW-REJECTED] PASSED [ 46%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PENDING_WINDOW-FAILED] PASSED [ 48%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PREEMPTED-RUNNING] PASSED [ 49%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PREEMPTED-QUEUED_PENDING_WINDOW] PASSED [ 50%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[QUEUED_PREEMPTED-EXPIRED] PASSED [ 51%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[RUNNING-COMPLETED] PASSED [ 53%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[RUNNING-FAILED] PASSED [ 54%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[RUNNING-CHECKPOINTING] PASSED [ 55%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[RUNNING-QUEUED_PREEMPTED] PASSED [ 56%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[RUNNING-EVICTED_RESUMABLE] PASSED [ 58%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[RUNNING-EVICTED_FORCEFULLY] PASSED [ 59%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[CHECKPOINTING-EVICTED_RESUMABLE] PASSED [ 60%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[CHECKPOINTING-EVICTION_FAILED] PASSED [ 61%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[CHECKPOINTING-EVICTED_FORCEFULLY] PASSED [ 62%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[CHECKPOINTING-QUEUED_PENDING_WINDOW] PASSED [ 64%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[CHECKPOINTING-QUEUED_PREEMPTED] PASSED [ 65%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[EVICTED_RESUMABLE-RUNNING] PASSED [ 66%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_legal_state_transitions_succeed[EVICTED_RESUMABLE-EXPIRED] PASSED [ 67%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[COMPLETED-RUNNING] PASSED [ 69%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[COMPLETED-CHECKPOINTING] PASSED [ 70%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[FAILED-RUNNING] PASSED [ 71%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[REJECTED-QUEUED_PENDING_WINDOW] PASSED [ 72%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[EXPIRED-RUNNING] PASSED [ 74%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[EVICTION_FAILED-COMPLETED] PASSED [ 75%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[EVICTED_FORCEFULLY-COMPLETED] PASSED [ 76%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[QUEUED_PENDING_WINDOW-COMPLETED] PASSED [ 77%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_all_illegal_state_transitions_raise_domain_error[QUEUED_PREEMPTED-COMPLETED] PASSED [ 79%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[100-0-100] PASSED [ 80%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[100-1-110] PASSED [ 81%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[100-2-120] PASSED [ 82%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[100-3-180] PASSED [ 83%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[100-4-190] PASSED [ 85%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[150-0-150] PASSED [ 86%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[150-3-230] PASSED [ 87%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_aging_and_starvation_promotion_curve[50-3-130] PASSED [ 88%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T21:59:58-05:00-True] PASSED [ 90%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T21:59:59-05:00-True] PASSED [ 91%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T22:00:00-05:00-True] PASSED [ 92%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T22:00:01-05:00-True] PASSED [ 93%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T22:00:02-05:00-True] PASSED [ 95%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T21:59:57-05:00-False] PASSED [ 96%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T22:00:03-05:00-False] PASSED [ 97%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T06:00:00-05:00-False] PASSED [ 98%]
+test/unit/test_domain_core.py::TestParameterizedDomainMatrix::test_window_activation_boundary_instants[2026-10-18T12:00:00-05:00-False] PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /mnt/c/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.12.3-final-0 ________________
+
+Name                      Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------
+domain/__init__.py            0      0      0      0   100%
+domain/allocation.py         58      0     26      0   100%
+domain/emitter.py            10      0      4      0   100%
+domain/engine.py            126      0     42      0   100%
+domain/entities.py          113      0      0      0   100%
+domain/ranking.py            28      0     12      0   100%
+domain/state_machine.py      39      0     18      0   100%
+---------------------------------------------------------------------
+TOTAL                       374      0    102      0   100%
+Required test coverage of 90.0% reached. Total coverage: 100.00%
+======================== 81 passed, 1 warning in 17.43s ========================

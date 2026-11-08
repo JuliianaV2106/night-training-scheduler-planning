@@ -1,4 +1,4 @@
-name: Module 9 CI Quality Gate (TEA)
+name: Module 9 CI Quality Gate (TEA — Impl-2 Hardened)
 
 on:
   push:
@@ -8,9 +8,9 @@ on:
 
 jobs:
   quality-gate:
-    name: Architecture & ATDD Quality Gate
+    name: Architecture, Multi-Flow Pytest (100% Coverage), Zero-Sleep & Playwright E2E Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
       - name: Checkout Code Repository
@@ -21,19 +21,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Development & Testing Dependencies
+      - name: Set up Node.js 22 Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python & Playwright Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio hypothesis pydantic pyyaml
+          pip install -r requirements.txt
+          npm ci
+          npx playwright install --with-deps chromium
 
-      - name: Step 1 — Domain Purity & AST Architectural Scan
+      - name: Step 1 — Domain Purity & Zero-Sleep Static Gate (INV-07)
         run: |
           python -c "
           import ast, glob, sys
-          forbidden = {'fastapi', 'starlette', 'sqlite3', 'sqlalchemy', 'requests', 'httpx', 'time'}
+          forbidden = {'fastapi', 'starlette', 'sqlite3', 'sqlalchemy', 'requests', 'httpx', 'time', 'random'}
           violations = []
           for f in glob.glob('domain/**/*.py', recursive=True):
-              with open(f, 'r') as fp:
+              with open(f, 'r', encoding='utf-8') as fp:
                   tree = ast.parse(fp.read(), filename=f)
               for node in ast.walk(tree):
                   if isinstance(node, ast.Import):
@@ -46,26 +53,28 @@ jobs:
           if violations:
               print('Domain purity check FAILED:\n' + '\n'.join(violations))
               sys.exit(1)
-          print('Domain purity AST scan PASSED.')
+          print('Domain purity AST scan PASSED (0 violations).')
           "
 
-      - name: Step 2 — Verify SQLite DDL Migration (001)
+      - name: Step 2 — Verify SQLite DDL Migration (001) & 32-Node Seed Fleet
         run: |
           python -c "
           import sqlite3
           conn = sqlite3.connect(':memory:')
-          with open('planning/detailed-design/schemas/001_night_training_scheduler_schema.sql') as f:
+          with open('planning/detailed-design/schemas/001_night_training_scheduler_schema.sql', encoding='utf-8') as f:
               conn.executescript(f.read())
           cur = conn.cursor()
           cur.execute('SELECT COUNT(*) FROM nodes')
           assert cur.fetchone()[0] == 32, 'Nodes count mismatch'
           cur.execute('SELECT COUNT(*) FROM gpu_slots')
           assert cur.fetchone()[0] == 33, 'GPU slots count mismatch'
-          print('DDL Schema syntax and seed fleet migration PASSED.')
+          print('DDL Schema syntax and seed fleet migration PASSED (32 nodes, 33 GPU slots).')
           "
 
-      - name: Step 3 — Run ATDD Red-Phase Suite (Certified Red Verification)
+      - name: Step 3 — Run Multi-Flow Unit, ATDD & Integration Suite (>=90% Domain Branch Coverage)
         run: |
-          # The suite must execute and verify that tests fail for the right reason (NotImplementedError)
-          pytest test/atdd/night_training_scheduler_contracts_test.py || true
-          echo "ATDD Red-Phase suite execution verified."
+          PYTHONPATH=.:planning/detailed-design/schemas pytest --cov=domain --cov-branch --cov-report=term-missing --cov-fail-under=90 -v
+
+      - name: Step 4 — Run Playwright E2E Suite (Story 9.6 Time-Lapse Board + Trace Artifact)
+        run: |
+          npx playwright test

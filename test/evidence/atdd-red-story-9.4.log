@@ -1,0 +1,75 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning
+configfile: pytest.ini
+plugins: anyio-4.16.0, hypothesis-6.170.15, asyncio-1.4.1.post1, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 1 item
+
+test/atdd/test_story_9_4_hard_eviction_atdd.py F                         [100%]
+
+=================================== FAILURES ===================================
+_ TestStory94HardEvictionATDD.test_hanging_training_job_killed_and_node_cordoned_before_morning_classes _
+
+self = <test.atdd.test_story_9_4_hard_eviction_atdd.TestStory94HardEvictionATDD object at 0x70c298d7c9b0>
+db = <sqlite3.Connection object at 0x70c298daa2f0>
+fake_clock = <test.fixtures.fake_clock.FakeClock object at 0x70c298dde330>
+sim_telemetry = <test.fixtures.sim_telemetry.SimTelemetry object at 0x70c298ddf2c0>
+
+    def test_hanging_training_job_killed_and_node_cordoned_before_morning_classes(
+        self, db, fake_clock, sim_telemetry
+    ):
+        """
+        Verifies the two-stage eviction timer (SIGTERM at 05:45, SIGKILL at 05:46 if un-halted)
+        and node cordoning (CORDONED_DIRTY) with zero residual GPU processes.
+        """
+        repo = SQLiteRepositoryAdapter(db)
+        cursor = db.cursor()
+    
+        # Given an active LoRA training job on node "ws-gpu-11" at 05:45 AM
+        job_id = "JOB-LORA-94"
+        node_id = "ws-gpu-11"
+        cursor.execute(
+            """
+            INSERT INTO jobs (
+                job_id, state, actor_id, idempotency_key, payload_digest,
+                gpu_slots_requested, required_vram_gb, checkpoint_interval_minutes,
+                estimated_duration_s, image_digest, model_id, model_version,
+                storage_request_bytes, submitted_at, allocated_node_id
+            ) VALUES (
+                ?, 'RUNNING', 'student-kavita', 'idemp-lora-94', ?,
+                1, 24, 15, 14400, ?, 'llama-3-8b-lora', '1.0', 2048,
+                '2026-10-18T22:00:00-05:00', ?
+            )
+            """,
+            (job_id, "a" * 64, "sha256:" + "b" * 64, node_id),
+        )
+        cursor.execute(
+            "UPDATE gpu_slots SET allocated_job_id = ?, held_since = '2026-10-18T22:00:00-05:00' WHERE node_id = ?",
+            (job_id, node_id),
+        )
+        db.commit()
+    
+>       PreMorningEvictionSupervisor = load_inbound_port_module("eviction_supervisor").PreMorningEvictionSupervisor
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+test/atdd/test_story_9_4_hard_eviction_atdd.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+ports/__init__.py:17: in load_inbound_port_module
+    spec.loader.exec_module(mod)
+<frozen importlib._bootstrap_external>:991: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:1128: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x70c298ddf440>
+path = '/mnt/c/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/ports/in/eviction_supervisor.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/juanc/college/9thSemerter/ai-assisted_development_process/night-training-scheduler-planning/ports/in/eviction_supervisor.py'
+
+<frozen importlib._bootstrap_external>:1186: FileNotFoundError
+=========================== short test summary info ============================
+FAILED test/atdd/test_story_9_4_hard_eviction_atdd.py::TestStory94HardEvictionATDD::test_hanging_training_job_killed_and_node_cordoned_before_morning_classes
+============================== 1 failed in 6.84s ===============================

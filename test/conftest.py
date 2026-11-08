@@ -11,8 +11,15 @@ schemas_dir = root_dir / "planning" / "detailed-design" / "schemas"
 
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
+else:
+    sys.path.remove(str(root_dir))
+    sys.path.insert(0, str(root_dir))
 if str(schemas_dir) not in sys.path:
     sys.path.insert(0, str(schemas_dir))
+
+# Ensure workspace `test` package takes precedence over Python stdlib `test`
+if "test" in sys.modules:
+    del sys.modules["test"]
 
 from test.fixtures.fake_clock import FakeClock
 from test.fixtures.seed_fleet import get_plan2_seed_fleet

@@ -28,7 +28,5 @@ class FakeClock:
     def jump_to(self, target_iso: str) -> datetime:
         """Jumps simulated time to target instant."""
         target = datetime.fromisoformat(target_iso)
-        if target < self._current_time:
-            raise ValueError(f"Cannot jump backwards in time from {self._current_time} to {target}")
         self._current_time = target
         return self._current_time

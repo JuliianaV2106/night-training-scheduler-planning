@@ -1,0 +1,13 @@
+{
+  "name": "night-training-scheduler-e2e",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Module 9 Night Training Scheduler — Playwright E2E Suite with Page Object Model & Forensic Traces",
+  "scripts": {
+    "test": "playwright test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

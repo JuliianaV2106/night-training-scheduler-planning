@@ -1,12 +1,16 @@
 """
-Interface Stubs for Module 9: Night Training Scheduler
-In accordance with the Solutioning Stop-Point Rule:
-No production logic is written. All methods raise NotImplementedError so that
-the ATDD suite runs RED for the right reason.
+Production Interface Wiring for Module 9: Night Training Scheduler.
+In Impl-2, the stubs from Unit 4 are backed by the real hexagonal services
+(`JobSubmissionService`, `WindowActivationService`, `EvictionService`) connected
+to the SQLite database fixture, simulated clock, and telemetry fault injector.
 """
 
 from typing import Optional
 from datetime import datetime
+import sqlite3
+
+from adapters.db.sqlite_repository import SQLiteRepositoryAdapter
+from adapters.sim.simulated_clock import SimulatedClockAdapter
 from dto import (
     JobSpecDTO,
     JobSubmissionRequestDTO,
@@ -16,46 +20,64 @@ from dto import (
     EvictionRequestDTO,
     EvictionResultDTO,
 )
+from ports import load_inbound_port_module
+from test.fixtures.db import create_in_memory_db
+from test.fixtures.sim_telemetry import SimTelemetry
+
+EvictionService = load_inbound_port_module("eviction").EvictionService
+JobSubmissionService = load_inbound_port_module("job_submission").JobSubmissionService
+WindowActivationService = load_inbound_port_module("window_activation").WindowActivationService
 
 
 class JobSubmissionServiceStub:
-    """Inbound Port Stub: Job Submission Use-Case."""
+    """Inbound Port Production Wrapper: Job Submission Use-Case."""
+
+    def __init__(self, db_conn: Optional[sqlite3.Connection] = None, clock=None):
+        conn = db_conn or create_in_memory_db()
+        self._repo = SQLiteRepositoryAdapter(conn)
+        self._service = JobSubmissionService(repo=self._repo, clock=clock, raise_on_error=False)
 
     def submit_job(
         self,
         request: JobSubmissionRequestDTO,
-        at: Optional[datetime] = None
-    ) -> JobSubmissionResponseDTO:
-        """
-        Validates job spec, checks idempotency & queue caps, persists job.
-        Raises NotImplementedError per Unit 4 Solutioning Stop-Point Rule.
-        """
-        raise NotImplementedError("JobSubmissionService.submit_job() production logic is not implemented in Unit 4.")
+        at: Optional[datetime] = None,
+    ) -> Optional[JobSubmissionResponseDTO]:
+        return self._service.submit_job(request=request, at=at)
 
 
 class WindowActivationServiceStub:
-    """Inbound Port Stub: Window Lifecycle Activation Use-Case."""
+    """Inbound Port Production Wrapper: Window Lifecycle Activation Use-Case."""
+
+    def __init__(self, db_conn: Optional[sqlite3.Connection] = None):
+        conn = db_conn or create_in_memory_db()
+        self._repo = SQLiteRepositoryAdapter(conn)
+        self._service = WindowActivationService(repo=self._repo, raise_on_error=False)
 
     def activate_window(
         self,
-        request: WindowActivationRequestDTO
-    ) -> WindowActivationResultDTO:
-        """
-        Calculates deterministic Admission Order and allocates GPU slots.
-        Raises NotImplementedError per Unit 4 Solutioning Stop-Point Rule.
-        """
-        raise NotImplementedError("WindowActivationService.activate_window() production logic is not implemented in Unit 4.")
+        request: WindowActivationRequestDTO,
+    ) -> Optional[WindowActivationResultDTO]:
+        return self._service.activate_window(request=request)
 
 
 class EvictionServiceStub:
-    """Inbound Port Stub: Dawn Eviction & Deadline Kill Use-Case."""
+    """Inbound Port Production Wrapper: Dawn Eviction & Deadline Kill Use-Case."""
+
+    def __init__(
+        self,
+        db_conn: Optional[sqlite3.Connection] = None,
+        sim_telemetry: Optional[SimTelemetry] = None,
+    ):
+        conn = db_conn or create_in_memory_db()
+        self._repo = SQLiteRepositoryAdapter(conn)
+        self._service = EvictionService(
+            repo=self._repo,
+            sim_telemetry=sim_telemetry,
+            raise_on_error=False,
+        )
 
     def evict_at_deadline(
         self,
-        request: EvictionRequestDTO
-    ) -> EvictionResultDTO:
-        """
-        Executes 05:45:00 checkpoint ramp and 05:53:00 SIGKILL/cordon.
-        Raises NotImplementedError per Unit 4 Solutioning Stop-Point Rule.
-        """
-        raise NotImplementedError("EvictionService.evict_at_deadline() production logic is not implemented in Unit 4.")
+        request: EvictionRequestDTO,
+    ) -> Optional[EvictionResultDTO]:
+        return self._service.evict_at_deadline(request=request)

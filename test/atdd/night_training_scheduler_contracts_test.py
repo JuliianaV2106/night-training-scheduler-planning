@@ -33,18 +33,18 @@ from test.fixtures.explain_assert import assert_explainability
 # =============================================================================
 
 @pytest.fixture
-def submission_stub() -> JobSubmissionServiceStub:
-    return JobSubmissionServiceStub()
+def submission_stub(db, fake_clock) -> JobSubmissionServiceStub:
+    return JobSubmissionServiceStub(db_conn=db, clock=fake_clock)
 
 
 @pytest.fixture
-def activation_stub() -> WindowActivationServiceStub:
-    return WindowActivationServiceStub()
+def activation_stub(db) -> WindowActivationServiceStub:
+    return WindowActivationServiceStub(db_conn=db)
 
 
 @pytest.fixture
-def eviction_stub() -> EvictionServiceStub:
-    return EvictionServiceStub()
+def eviction_stub(db, sim_telemetry) -> EvictionServiceStub:
+    return EvictionServiceStub(db_conn=db, sim_telemetry=sim_telemetry)
 
 
 def build_valid_job_spec(
@@ -140,7 +140,7 @@ class TestSubmitJobContract:
                     estimated_duration_s, image_digest, model_id, model_version,
                     storage_request_bytes, submitted_at
                 ) VALUES (
-                    ?, 'QUEUED_PENDING_WINDOW', 'user-batch', ?, 'digest000000000000000000000000000000000000000000000000000000000000',
+                    ?, 'QUEUED_PENDING_WINDOW', 'user-batch', ?, 'digest0000000000000000000000000000000000000000000000000000000000',
                     1, 24, 15, 3600, 'sha256:' || hex(randomblob(32)), 'model-1', '1.0', 1000, '2026-10-18T20:00:00-05:00'
                 )
                 """,
@@ -187,7 +187,7 @@ class TestSubmitJobContract:
                     estimated_duration_s, image_digest, model_id, model_version,
                     storage_request_bytes, submitted_at
                 ) VALUES (
-                    'JOB-INV3', 'QUEUED_PENDING_WINDOW', 'user-inv3', 'key-inv3', 'digest000000000000000000000000000000000000000000000000000000000000',
+                    'JOB-INV3', 'QUEUED_PENDING_WINDOW', 'user-inv3', 'key-inv3', 'digest0000000000000000000000000000000000000000000000000000000000',
                     2, 24, 15, 3600, 'sha256:' || hex(randomblob(32)), 'model-1', '1.0', 1000, '2026-10-18T20:00:00-05:00'
                 )
                 """
@@ -339,7 +339,7 @@ class TestEvictAtDeadlineContract:
                 estimated_duration_s, image_digest, model_id, model_version,
                 storage_request_bytes, submitted_at, allocated_node_id
             ) VALUES (
-                ?, 'RUNNING', 'student-maria', 'key-edge-01', 'digest000000000000000000000000000000000000000000000000000000000000',
+                ?, 'RUNNING', 'student-maria', 'key-edge-01', 'digest0000000000000000000000000000000000000000000000000000000000',
                 1, 24, 15, 14400, 'sha256:' || hex(randomblob(32)), 'model-1', '1.0', 1000,
                 '2026-10-18T20:00:00-05:00', ?
             )

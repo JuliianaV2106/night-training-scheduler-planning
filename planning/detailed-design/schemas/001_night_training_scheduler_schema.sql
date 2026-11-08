@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     node_id TEXT PRIMARY KEY,
     vram_class_gb INTEGER NOT NULL CHECK (vram_class_gb IN (24, 48)),
     total_slots INTEGER NOT NULL CHECK (total_slots IN (1, 2)),
-    status TEXT NOT NULL DEFAULT 'HEALTHY' CHECK (status IN ('HEALTHY', 'DRAINING', 'CORDONED', 'RESERVED')),
+    status TEXT NOT NULL DEFAULT 'HEALTHY' CHECK (status IN ('HEALTHY', 'IDLE', 'DRAINING', 'CORDONED', 'CORDONED_DIRTY', 'DIRTY_EVICTION_FAILED', 'RESERVED')),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S-05:00', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S-05:00', 'now')),
     -- Physical Invariant: Only server-gpu-01 can have 2 slots and 48 GB VRAM
@@ -47,12 +47,14 @@ CREATE TABLE IF NOT EXISTS jobs (
         state IN (
             'REJECTED', 
             'QUEUED_PENDING_WINDOW', 
+            'QUEUED_PREEMPTED',
             'RUNNING', 
             'CHECKPOINTING', 
             'EVICTED_RESUMABLE', 
             'COMPLETED', 
             'FAILED', 
             'EVICTION_FAILED', 
+            'EVICTED_FORCEFULLY',
             'EXPIRED'
         )
     ),
@@ -71,7 +73,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     model_version TEXT NOT NULL,
     storage_request_bytes INTEGER NOT NULL CHECK (storage_request_bytes > 0),
     effective_priority INTEGER NOT NULL DEFAULT 100,
-    granted_priority TEXT NOT NULL DEFAULT 'NORMAL' CHECK (granted_priority IN ('NORMAL', 'THESIS', 'URGENT')),
+    granted_priority TEXT NOT NULL DEFAULT 'NORMAL' CHECK (granted_priority IN ('EXPLORATION', 'NORMAL', 'THESIS', 'URGENT')),
     consecutive_nights_missed INTEGER NOT NULL DEFAULT 0 CHECK (consecutive_nights_missed >= 0),
     admitted_nights INTEGER NOT NULL DEFAULT 0 CHECK (admitted_nights >= 0),
     retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count BETWEEN 0 AND 1),
